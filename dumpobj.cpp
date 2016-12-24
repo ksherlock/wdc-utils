@@ -19,6 +19,13 @@ enum class endian {
 };
 
 
+
+extern unsigned init_flags(bool longM, bool longX);
+void dump(const std::vector<uint8_t> &data, unsigned &pc);
+extern void disasm(const std::vector<uint8_t> &data, unsigned &flags, unsigned &pc);
+
+
+
 template<class T>
 void swap_if(T &t, std::false_type) {}
 
@@ -175,6 +182,7 @@ void dump_obj(const char *name, int fd)
 
 	uint8_t op = REC_END;
 	uint32_t pc = 0;
+	unsigned flags = init_flags(true, true);
 
 	auto iter = data.begin();
 	while (iter != data.end()) {
@@ -182,9 +190,11 @@ void dump_obj(const char *name, int fd)
 		op = read_8(iter);
 		if (op == 0) break;
 		if (op < 0xf0) {
+			std::vector<uint8_t> tmp(iter, iter + op);
+
 			iter += op;
-			pc += op;
 			printf("DATA: %02x\n", op);
+			disasm(tmp, flags, pc);
 			continue;
 		}
 
