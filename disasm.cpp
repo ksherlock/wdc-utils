@@ -53,8 +53,8 @@ static constexpr const int m_S =          0x0100;
 static constexpr const int m_X =          0x0200;
 static constexpr const int m_Y =          0x0400;
 
-static constexpr const int m_M =          0x0010;
-static constexpr const int m_I =          0x0020;
+static constexpr const int m_M =          0x0020;
+static constexpr const int m_I =          0x0010;
 
 static constexpr const int modes[] =
 {
@@ -264,7 +264,7 @@ static constexpr const int modes[] =
 	
 	1 | mImmediate | m_I,           // c0 cpy #imm
 	1 | mDPI | m_X,                 // c1 cmp (dp,x)
-	1 | mAbsolute,                  // c2 rep #
+	1 | mImmediate,                 // c2 rep #
 	1 | mDP | m_S,                  // c3 cmp ,s
 	1 | mDP,                        // c4 cpy <dp
 	1 | mDP,                        // c5 cmp <dp
@@ -298,7 +298,7 @@ static constexpr const int modes[] =
 	
 	1 | mImmediate | m_I,           // e0 cpx #imm
 	1 | mDPI | m_X,                 // e1 sbc (dp,x)
-	1 | mAbsolute,                  // e2 sep #imm
+	1 | mImmediate,                 // e2 sep #imm
 	1 | mDP | m_S,                  // e3 sbc ,s
 	1 | mDP,                        // e4 cpx <dp
 	1 | mDP,                        // e5 sbc <dp
@@ -375,10 +375,20 @@ void disasm(const std::vector<uint8_t> &data, unsigned &flags, unsigned &pc) {
 		switch(attr & 0xf000) {
 			case mImmediate: printf("\t#"); break;
 			case mDP: printf("\t<"); break;
-			case mAbsolute: printf("\t|"); break;
+			case mDPI: printf("\t(<"); break;
+			case mDPIL: printf("\t[<"); break;
+
+			case mRelative:
+			case mBlockMove:
+				printf("\t"); break;
+
+			// cop, brk are treated as absolute.
+			case mAbsolute: 
+				if (size == 1) printf("\t");
+				else printf("\t|");
+				break;
 			case mAbsoluteLong: printf("\t>"); break;
-			case mAbsoluteI: printf("("); break;
-			case mDPIL: printf("[<"); break;
+			case mAbsoluteI: printf("\t("); break;
 		}
 
 
@@ -388,7 +398,7 @@ void disasm(const std::vector<uint8_t> &data, unsigned &flags, unsigned &pc) {
 		}
 
 		// todo -- relative, block mode.
-		switch(size) {
+		switch (size) {
 			case 0: break;
 			case 1: printf("$%02x", arg); break;
 			case 2: printf("$%04x", arg); break;
@@ -423,11 +433,15 @@ void disasm(const std::vector<uint8_t> &data, unsigned &flags, unsigned &pc) {
 
 		switch(op) {
 			case 0xc2: // REP
-				if (arg & 0x20) flags |= m_M;
-				if (arg & 0x10) flags |= m_I;
+				flags |= (arg & 0x30);
+				break;
+				//if (arg & 0x10) flags |= m_I;
+				//if (arg & 0x20) flags |= m_M;
+				break;
 			case 0xe2: // SEP
-				if (arg & 0x20) flags &= ~m_M;
-				if (arg & 0x10) flags &= ~m_I;
+				flags &= ~(arg & 0x30);
+				//if (arg & 0x10) flags &= ~m_I;
+				//if (arg & 0x20) flags &= ~m_M;
 				break;
 		}
 

@@ -193,7 +193,7 @@ void dump_obj(const char *name, int fd)
 			std::vector<uint8_t> tmp(iter, iter + op);
 
 			iter += op;
-			printf("DATA: %02x\n", op);
+			//printf("DATA: %02x\n", op);
 			disasm(tmp, flags, pc);
 			continue;
 		}
@@ -230,6 +230,8 @@ void dump_obj(const char *name, int fd)
 								break;
 							case OP_SHR: printf(">> "); break;
 							case OP_SHL: printf("<< "); break;
+							case OP_ADD: printf("+ "); break;
+							case OP_SUB: printf("- "); break;
 							default:
 								printf("\n");
 								errx(EX_DATAERR, "%s: unknown expression opcode %02x", name, op);
@@ -263,21 +265,25 @@ void dump_obj(const char *name, int fd)
 					};
 
 					uint16_t size = read_16(iter);
-					printf("\t;DEBUG\n");
+					//printf("\t;DEBUG\n");
 
 					for (unsigned i = 0; i < size; ++i) {
 						uint8_t op = read_8(iter);
 						switch(op) {
 							case D_LONGA_ON:
+								flags |= 0x20;
 								printf("\tlonga\ton\n");
 								break;
 							case D_LONGA_OFF:
+								flags &= ~0x20;
 								printf("\tlonga\toff\n");
 								break;
 							case D_LONGI_ON:
+								flags |= 0x10;
 								printf("\tlongi\ton\n");
 								break;
 							case D_LONGI_OFF:
+								flags &= ~0x10;
 								printf("\tlongi\toff\n");
 								break;
 							case D_C_FILE: {
@@ -314,8 +320,13 @@ void dump_obj(const char *name, int fd)
 				printf("\t.sect\t%d\n", section);
 				break;
 			}
+			case REC_ORG: {
+				uint32_t org = read_32(iter);
+				printf("\t.org\t$%04x\n", org);
+				break;
+			}
+
 			case REC_SPACE:
-			case REC_ORG:
 			case REC_RELEXP:
 			case REC_LINE:
 			default:
