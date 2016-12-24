@@ -1,0 +1,116 @@
+.Dd December 24, 2016
+.Dt WDCLIB 1
+.Os
+.Sh NAME
+.Nm wdclib
+.Nd WDC Librarian
+.Sh SYNOPSIS
+.Nm
+.Op Fl F Ar argfile
+.Op Fl A | D | L | S | X
+.Ar library
+.Op Ar objfile ...
+.Sh DESCRIPTION
+.Nm
+is a utility program that manipulates libraries of object modules.
+.Nm
+makes it possible to create a library of commonly used functions. This
+library can be very efficiently searched and any modules required by the
+program can be extracted from the library and placed in the output file.
+.Pp
+Since several object 
+modules may be contained in the same original source file,
+.Nm
+keeps track of the name of the file that each module comes from.
+This allows all the modules associated with a file to be manipulated
+without tediously typing in the name of each module. Options may be
+specified individually or together.
+.Sh OPTIONS
+.Bl -tag -width indent
+.It Fl A
+This option tells
+.Nm
+to add the specified files to the library. The symbol dictionary is updated
+to include the names of symbols defined in the object modules in the files.
+If none of the options 
+.Fl A , D , 
+or
+.Fl X
+are given, the default is to assume option 
+.Fl A .
+To create a library from a set of object files, use the command:
+.Pp
+.Dl WDCLIB -A MYLIB.LIB LIBSRC1.OBJ LIBSRC2.OBJ LIBSRC3.OBJ
+.Pp
+which will create a library file called 
+.Ar MYLIB.LIB
+and add all the modules
+from the three object files. If 
+.Ar MYLIB.LIB
+already existed, the modules
+from the three object files will be added to the library.
+.It Fl D
+The modules in the library that originally came from the named files are
+deleted from the library. Modules must be deleted before being replaced
+with new ones.
+.Pp
+The following example shows how to remove the modules associated with an
+object file.
+.Pp
+.Dl WDCLIB -D MYLIB.LIB LIBSRC3.OBJ
+.Pp
+All of the modules associated with the file
+.Ar LIBSRC3.OBJ
+will be deleted from the library. 
+.Pp
+This example shows how to replace a file in a library.
+.Pp
+.Dl WDCLIB -D MYLIB.LIB LIBSRC2.OBJ
+.Dl WDCLIB -A MYLIB.LIB LIBSRC2.OBJ
+.Pp
+The modules associated with 
+.Ar LIBSRC2.OBJ
+will first be deleted from the library and then added from the new version
+of the file. The following options display information about the library
+file after the modification arguments, if any, have been processed.
+.It Fl F
+This option must be followed by the name of a text file. The file will be
+read and arguments will be extracted from the file. When the end of file
+is reached, additional arguments are again extracted from the command
+line. This allows more object modules than will fit on the standard command
+line to be processed at one time.
+.Pp
+For example, these commands add all files with a 
+.Ar .OBJ
+extension to the library.
+.Pp
+.Dl DIR *.OBJ > OBJLIST
+.Dl WDCLIB -A MYLIB.LIB -F OBJLIST
+.It Fl L
+This option causes a list of the files in the library to be printed.
+Associated with each file name is a file number. This number will also
+appear in the symbol listing which indicates which file contains the
+module that defines that symbol. This command will display the names
+of all files added to a library.
+.Pp
+.Dl WDCLIB -L MYLIB.LIB
+.Pp
+This command adds two files to the library.
+.Pp
+.Dl WDCLIB -AL MYLIB.LIB LIBSRC1.OBJ LIBSRC2.OBJ
+.Pp
+After the files are added, a list of all the files in the library will
+be printed.
+.It Fl S
+This option causes the dictionary of symbols contained in the library to
+be printed. The dictionary is printed in alphabetical order. The number
+of the file that defined the symbol along with the offset into the
+library of the module that defined it are printed beside the symbol name.
+.It Fl X
+The modules in the library that originally came from the named files
+are extracted from the library and placed into files with the same
+name. After extraction, the modules in the library are deleted.
+.Pp
+The following example extracts two files from a library.
+.Pp
+.Dl WDCLIB -X MYLIB.LIB LIBSRC3.OBJ LIBSRC1.OBJ
