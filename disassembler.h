@@ -24,12 +24,12 @@ class disassembler {
 
 		void set_m(bool x) {
 			if (x) _flags |= 0x20;
-			else _flags &= 0x20;
+			else _flags &= ~0x20;
 		}
 
 		void set_x(bool x) {
 			if (x) _flags |= 0x10;
-			else _flags &= 0x10;
+			else _flags &= ~0x10;
 		}
 
 		void set_pc(uint32_t pc) { pc = _pc; }

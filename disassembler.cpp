@@ -399,7 +399,6 @@ void disassembler::process(uint8_t byte) {
 		case 0xc2: // REP
 			_flags |= (_arg & 0x30);
 			break;
-			break;
 		case 0xe2: // SEP
 			_flags &= ~(_arg & 0x30);
 			break;
