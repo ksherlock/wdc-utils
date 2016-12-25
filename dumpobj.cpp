@@ -166,19 +166,32 @@ void dump_obj(const char *name, int fd)
 
 
 	printf("name: %s\n", oname.data());
-	printf("record size: %04x\n", h.h_recsize);
-	printf("section size: %04x\n", h.h_secsize);
-	printf("symbol size: %04x\n", h.h_symsize);
-	printf("option size: %04x\n", h.h_optsize);
-	printf("number sections: %04x\n", h.h_num_secs);
-	printf("number symbols: %04x\n", h.h_num_syms);
+	printf("record size    : $%04x\n", h.h_recsize);
+	printf("section size   : $%04x\n", h.h_secsize);
+	printf("symbol size    : $%04x\n", h.h_symsize);
+	printf("option size    : $%04x\n", h.h_optsize);
+	printf("number sections: $%04x\n", h.h_num_secs);
+	printf("number symbols : $%04x\n", h.h_num_syms);
 
 	// records [until record_eof]
 
 	std::vector<uint8_t> data;
 	data.resize(h.h_recsize);
 	ok = read(fd, data.data(), h.h_recsize);
-	if (ok != h.h_recsize) errx(EX_DATAERR, "%s truncated", name);
+	if (ok != h.h_recsize) errx(EX_DATAERR, "%s records truncated", name);
+
+
+	std::vector<uint8_t> section_data;
+	section_data.resize(h.h_secsize);
+	ok = read(fd, section_data.data(), h.h_secsize);
+	if (ok != h.h_secsize) errx(EX_DATAERR, "%s sections truncated", name);
+
+
+	std::vector<uint8_t> symbol_data;
+	symbol_data.resize(h.h_symsize);
+	ok = read(fd, symbol_data.data(), h.h_symsize);
+	if (ok != h.h_symsize) errx(EX_DATAERR, "%s symbols truncated", name);
+
 
 
 	uint8_t op = REC_END;
@@ -204,42 +217,60 @@ void dump_obj(const char *name, int fd)
 					uint8_t op = 0;
 					bytes = read_8(iter);
 
-					std::string tmp;
 					char buffer[32];
 
+
+					std::vector<std::string> stack;
+
+					// todo -- need to keep operation for precedence?
+					// this ignores all precedence...
 
 					for(;;) {
 						op = read_8(iter);
 						if (op == OP_END) break;
 						switch (op) {
 							case OP_LOC: {
-									uint8_t section = read_8(iter);
-									uint32_t offset = read_32(iter);
-									if (section < sizeof(sections) / sizeof(sections[0]))
-										snprintf(buffer, sizeof(buffer), "%s+%04x ", sections[section], offset);
-									else
-										snprintf(buffer, sizeof(buffer), "section %02x+%04x ", section, offset);
-								}
-								tmp.append(buffer);
+								uint8_t section = read_8(iter);
+								uint32_t offset = read_32(iter);
+								if (section < sizeof(sections) / sizeof(sections[0]))
+									snprintf(buffer, sizeof(buffer), "%s+$%04x", sections[section], offset);
+								else
+									snprintf(buffer, sizeof(buffer), "section %02x+$%04x", section, offset);
+								stack.push_back(buffer);
 								break;
+							}
+
 							case OP_VAL:
-								snprintf(buffer, sizeof(buffer), "$%04x ", read_32(iter));
-								tmp.append(buffer);
+								snprintf(buffer, sizeof(buffer), "$%04x", read_32(iter));
+								stack.push_back(buffer);
 								break;
+
 							case OP_SYM:
-								snprintf(buffer, sizeof(buffer), "symbol %02x ", read_16(iter));
-								tmp.append(buffer);
+								snprintf(buffer, sizeof(buffer), "symbol $%02x", read_16(iter));
+								stack.push_back(buffer);
 								break;
-							case OP_SHR: tmp.append(">> "); break;
-							case OP_SHL: tmp.append("<< "); break;
-							case OP_ADD: tmp.append("+ "); break;
-							case OP_SUB: tmp.append("- "); break;
+
+							case OP_SHR: 
+							case OP_SHL:
+							case OP_ADD: 
+							case OP_SUB: {
+								static const char *ops[] = {
+									"**", "*", "/", "%", ">>", "<<", "+", "-", "&", "|", "^", "=", ">", "<"
+
+								};
+								if (stack.size() < 2) errx(EX_DATAERR, "%s : stack underflow error", name);
+								std::string a = std::move(stack.back()); stack.pop_back();
+								std::string b = std::move(stack.back()); stack.pop_back();
+								stack.emplace_back(b + ops[op-20] + a);
+								break;
+							}
 							default:
 								errx(EX_DATAERR, "%s: unknown expression opcode %02x", name, op);
 
 						}
 					}
-					d.process(tmp, bytes);
+					if (stack.size() != 1) errx(EX_DATAERR, "%s stack overflow error.", name);
+					d.process(stack.front(), bytes);
 				}
 				break;
 
@@ -345,14 +376,10 @@ void dump_obj(const char *name, int fd)
 
 	// section info
 
-	data.resize(h.h_secsize);
-	ok = read(fd, data.data(), h.h_secsize);
-	if (ok != h.h_secsize) errx(EX_DATAERR, "%s truncated", name);
-
 	printf("\nSections\n");
 
-	iter = data.begin();
-	while (iter != data.end()) {
+	iter = section_data.begin();
+	while (iter != section_data.end()) {
 
 
 		uint8_t number = read_8(iter);
@@ -382,23 +409,20 @@ void dump_obj(const char *name, int fd)
 
 
 	// symbol info
-	data.resize(h.h_symsize);
-	ok = read(fd, data.data(), h.h_symsize);
-	if (ok != h.h_symsize) errx(EX_DATAERR, "%s truncated", name);
 
 	printf("\nSymbols\n");
 
-	iter = data.begin();
-	while (iter != data.end()) {
+	iter = symbol_data.begin();
+	while (iter != symbol_data.end()) {
 		uint8_t type = read_8(iter);
 		uint8_t flags = read_8(iter);
 		uint8_t section = read_8(iter);
 		uint32_t offset = type == S_UND ? 0 : read_32(iter);
 		std::string name = read_cstring(iter);
 
-		printf("name: %s\n", name.c_str());
-		printf("type: %02x %s\n", type, type < sizeof(types) / sizeof(types[0]) ? types[type] : "");
-		printf("flags: %02x ", flags);
+		printf("name : %s\n", name.c_str());
+		printf("type : $%02x %s\n", type, type < sizeof(types) / sizeof(types[0]) ? types[type] : "");
+		printf("flags: $%02x ", flags);
 #undef _
 #define _(x) if (flags & x) fputs(#x " ", stdout)
 		_(SF_GBL);
@@ -444,9 +468,9 @@ void dump_lib(const char *name, int fd)
 	assert(h.l_version == 1);
 	assert(h.l_filtyp == 2);
 
-	printf("modstart: %04x\n", h.l_modstart);
-	printf("number symbols: %04x\n", h.l_numsyms);
-	printf("number files: %04x\n", h.l_numfiles);
+	printf("modstart      : $%04x\n", h.l_modstart);
+	printf("number symbols: $%04x\n", h.l_numsyms);
+	printf("number files  : $%04x\n", h.l_numfiles);
 
 	printf("\n");
 	std::vector<uint8_t> data;
@@ -462,7 +486,7 @@ void dump_lib(const char *name, int fd)
 	for (int i = 0; i < h.l_numfiles; ++i) {
 		uint16_t file_number = read_16(iter);
 		std::string s = read_pstring(iter);
-		printf("%02x %s\n", file_number, s.c_str());
+		printf("$%02x %s\n", file_number, s.c_str());
 	}
 	printf("\n");
 
@@ -474,10 +498,10 @@ void dump_lib(const char *name, int fd)
 		uint32_t offset = read_32(iter);
 		std::string name = read_pstring(name_iter);
 
-		printf("symbol: %04x %s\n", i, name.c_str());
+		printf("symbol       : $%04x %s\n", i, name.c_str());
 		//printf("name offset: %02x\n", name_offset);
-		printf("file_number: %02x\n", file_number);
-		printf("module offset: %04x\n", offset); 
+		printf("file_number  : $%02x\n", file_number);
+		printf("module offset: $%04x\n", offset); 
 	}
 	printf("\n");
 
