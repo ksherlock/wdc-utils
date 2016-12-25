@@ -9,6 +9,8 @@
 
 #include <type_traits>
 #include <vector>
+#include <algorithm>
+#include <iterator>
 
 #include "obj816.h"
 #include "disassembler.h"
@@ -129,6 +131,57 @@ std::string read_pstring(T &iter) {
 	return s;
 }
 
+
+struct symbol {
+	std::string name;
+	uint8_t type;
+	uint8_t flags;
+	uint8_t section;
+	uint32_t offset;
+};
+
+
+std::vector<symbol> read_symbols(const std::vector<uint8_t> &symbol_data) {
+
+	std::vector<symbol> symbols;
+
+	auto iter = symbol_data.begin();
+	while (iter != symbol_data.end()) {
+		uint8_t type = read_8(iter);
+		uint8_t flags = read_8(iter);
+		uint8_t section = read_8(iter);
+		uint32_t offset = type == S_UND ? 0 : read_32(iter);
+		std::string name = read_cstring(iter);
+
+
+		symbols.emplace_back(symbol{name, type, flags, section, offset});
+	}
+
+	return symbols;
+}
+
+std::vector<symbol> labels_for_section(const std::vector<symbol> &symbols, unsigned section) {
+	std::vector<symbol> out;
+	std::copy_if(symbols.begin(), symbols.end(), std::back_inserter(out), 
+		[section](const symbol &s) { return s.section == section  && s.type != S_UND; }
+	);
+
+	std::sort(out.begin(), out.end(), [](const symbol &a, const symbol &b){
+		return a.offset > b.offset;
+	});
+
+	return out;
+}
+
+symbol find_symbol(const std::vector<symbol> &symbols, unsigned section, unsigned offset) {
+	auto iter = std::find_if(symbols.begin(), symbols.end(), [section, offset](const symbol &s){
+		return s.section == section && s.offset == offset && s.type != S_UND;
+	});
+	if (iter != symbols.end()) return *iter;
+	return symbol{"", S_UND, 0, 0xff, 0};
+}
+
+
 void dump_obj(const char *name, int fd)
 {
 	static const char *sections[] = { "PAGE0", "CODE", "KDATA", "DATA", "UDATA" };
@@ -192,6 +245,10 @@ void dump_obj(const char *name, int fd)
 	ok = read(fd, symbol_data.data(), h.h_symsize);
 	if (ok != h.h_symsize) errx(EX_DATAERR, "%s symbols truncated", name);
 
+	std::vector<symbol> symbols = read_symbols(symbol_data);
+
+	unsigned section = 1; // default section = CODE.
+	std::vector<symbol> labels = labels_for_section(symbols, section);
 
 
 	uint8_t op = REC_END;
@@ -200,6 +257,11 @@ void dump_obj(const char *name, int fd)
 
 	auto iter = data.begin();
 	while (iter != data.end()) {
+
+		while (!labels.empty() && labels.back().offset == d.pc()) {
+			printf("%s:\n", labels.back().name.c_str());
+			labels.pop_back();
+		}
 
 		op = read_8(iter);
 		if (op == 0) break;
@@ -232,11 +294,18 @@ void dump_obj(const char *name, int fd)
 							case OP_LOC: {
 								uint8_t section = read_8(iter);
 								uint32_t offset = read_32(iter);
-								if (section < sizeof(sections) / sizeof(sections[0]))
-									snprintf(buffer, sizeof(buffer), "%s+$%04x", sections[section], offset);
-								else
-									snprintf(buffer, sizeof(buffer), "section %02x+$%04x", section, offset);
-								stack.push_back(buffer);
+
+								symbol s = find_symbol(symbols, section, offset);
+								if (s.type) {
+									stack.push_back(s.name);
+								} else {
+
+									if (section < sizeof(sections) / sizeof(sections[0]))
+										snprintf(buffer, sizeof(buffer), "%s+$%04x", sections[section], offset);
+									else
+										snprintf(buffer, sizeof(buffer), "section %02x+$%04x", section, offset);
+									stack.push_back(buffer);
+								}
 								break;
 							}
 
@@ -245,10 +314,15 @@ void dump_obj(const char *name, int fd)
 								stack.push_back(buffer);
 								break;
 
-							case OP_SYM:
-								snprintf(buffer, sizeof(buffer), "symbol $%02x", read_16(iter));
-								stack.push_back(buffer);
+							case OP_SYM: {
+								uint16_t symbol = read_16(iter);
+								if (symbol < symbols.size()) stack.push_back(symbols[symbol].name);
+								else {
+									snprintf(buffer, sizeof(buffer), "symbol $%02x", symbol);
+									stack.push_back(buffer);
+								}
 								break;
+							}
 
 							case OP_SHR: 
 							case OP_SHL:
@@ -350,8 +424,12 @@ void dump_obj(const char *name, int fd)
 			case REC_SECT: {
 
 				d.flush();
-				uint8_t section = read_8(iter);
-				printf("\t.sect\t%d\n", section);
+				uint8_t sec = read_8(iter);
+				printf("\t.sect\t%d\n", sec);
+				if (sec != section) {
+					section = sec;
+					labels = labels_for_section(symbols, section);
+				}
 				break;
 			}
 			case REC_ORG: {
@@ -359,6 +437,7 @@ void dump_obj(const char *name, int fd)
 				d.flush();
 				uint32_t org = read_32(iter);
 				printf("\t.org\t$%04x\n", org);
+				d.set_pc(org);
 				break;
 			}
 
