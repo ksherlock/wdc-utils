@@ -11,6 +11,7 @@
 #include <vector>
 
 #include "obj816.h"
+#include "disassembler.h"
 
 enum class endian {
 	little = __ORDER_LITTLE_ENDIAN__,
@@ -20,9 +21,9 @@ enum class endian {
 
 
 
-extern unsigned init_flags(bool longM, bool longX);
-void dump(const std::vector<uint8_t> &data, unsigned &pc);
-extern void disasm(const std::vector<uint8_t> &data, unsigned &flags, unsigned &pc);
+//extern unsigned init_flags(bool longM, bool longX);
+//void dump(const std::vector<uint8_t> &data, unsigned &pc);
+//extern void disasm(const std::vector<uint8_t> &data, unsigned &flags, unsigned &pc);
 
 
 
@@ -181,8 +182,8 @@ void dump_obj(const char *name, int fd)
 
 
 	uint8_t op = REC_END;
-	uint32_t pc = 0;
-	unsigned flags = init_flags(true, true);
+
+	disassembler d;
 
 	auto iter = data.begin();
 	while (iter != data.end()) {
@@ -190,11 +191,8 @@ void dump_obj(const char *name, int fd)
 		op = read_8(iter);
 		if (op == 0) break;
 		if (op < 0xf0) {
-			std::vector<uint8_t> tmp(iter, iter + op);
-
+			d.process(iter, iter + op);
 			iter += op;
-			//printf("DATA: %02x\n", op);
-			disasm(tmp, flags, pc);
 			continue;
 		}
 
@@ -206,8 +204,9 @@ void dump_obj(const char *name, int fd)
 					uint8_t op = 0;
 					bytes = read_8(iter);
 
-					printf("EXPR: %02x : ", bytes);
-					pc += bytes;
+					std::string tmp;
+					char buffer[32];
+
 
 					for(;;) {
 						op = read_8(iter);
@@ -217,34 +216,35 @@ void dump_obj(const char *name, int fd)
 									uint8_t section = read_8(iter);
 									uint32_t offset = read_32(iter);
 									if (section < sizeof(sections) / sizeof(sections[0]))
-										printf("%s+%04x ", sections[section], offset);
+										snprintf(buffer, sizeof(buffer), "%s+%04x ", sections[section], offset);
 									else
-										printf("section %02x+%04x ", section, offset);
+										snprintf(buffer, sizeof(buffer), "section %02x+%04x ", section, offset);
 								}
+								tmp.append(buffer);
 								break;
 							case OP_VAL:
-								printf("%04x ", read_32(iter));
+								snprintf(buffer, sizeof(buffer), "$%04x ", read_32(iter));
+								tmp.append(buffer);
 								break;
 							case OP_SYM:
-								printf("symbol %02x ", read_16(iter));
+								snprintf(buffer, sizeof(buffer), "symbol %02x ", read_16(iter));
+								tmp.append(buffer);
 								break;
-							case OP_SHR: printf(">> "); break;
-							case OP_SHL: printf("<< "); break;
-							case OP_ADD: printf("+ "); break;
-							case OP_SUB: printf("- "); break;
+							case OP_SHR: tmp.append(">> "); break;
+							case OP_SHL: tmp.append("<< "); break;
+							case OP_ADD: tmp.append("+ "); break;
+							case OP_SUB: tmp.append("- "); break;
 							default:
-								printf("\n");
 								errx(EX_DATAERR, "%s: unknown expression opcode %02x", name, op);
 
 						}
 					}
-					printf("\n");
+					d.process(tmp, bytes);
 				}
 				break;
 
 			case REC_DEBUG:
 				{
-
 					static const char *debugs[] = {
 						"D_C_FILE",
 						"D_C_LINE",
@@ -264,6 +264,7 @@ void dump_obj(const char *name, int fd)
 						"D_LONGI_OFF",
 					};
 
+					d.flush();
 					uint16_t size = read_16(iter);
 					//printf("\t;DEBUG\n");
 
@@ -271,19 +272,19 @@ void dump_obj(const char *name, int fd)
 						uint8_t op = read_8(iter);
 						switch(op) {
 							case D_LONGA_ON:
-								flags |= 0x20;
+								d.set_m(true);
 								printf("\tlonga\ton\n");
 								break;
 							case D_LONGA_OFF:
-								flags &= ~0x20;
+								d.set_m(false);
 								printf("\tlonga\toff\n");
 								break;
 							case D_LONGI_ON:
-								flags |= 0x10;
+								d.set_x(true);
 								printf("\tlongi\ton\n");
 								break;
 							case D_LONGI_OFF:
-								flags &= ~0x10;
+								d.set_x(false);
 								printf("\tlongi\toff\n");
 								break;
 							case D_C_FILE: {
@@ -316,11 +317,15 @@ void dump_obj(const char *name, int fd)
 				break;
 
 			case REC_SECT: {
+
+				d.flush();
 				uint8_t section = read_8(iter);
 				printf("\t.sect\t%d\n", section);
 				break;
 			}
 			case REC_ORG: {
+
+				d.flush();
 				uint32_t org = read_32(iter);
 				printf("\t.org\t$%04x\n", org);
 				break;
@@ -330,6 +335,7 @@ void dump_obj(const char *name, int fd)
 			case REC_RELEXP:
 			case REC_LINE:
 			default:
+				d.flush();
 				errx(EX_DATAERR, "%s: unknown opcode %02x", name, op);
 		}
 	}
