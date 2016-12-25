@@ -344,7 +344,7 @@ void dump(const std::vector<uint8_t> &data, unsigned &pc) {
 
 	int count = 0;
 	for (auto &x : data) {
-		if (count == 0) printf("\t.byte\t");
+		if (count == 0) printf("\tbyte\t");
 		else printf(", ");
 		printf("$%02x", x);
 		++count;
@@ -450,7 +450,7 @@ void disasm(const std::vector<uint8_t> &data, unsigned &flags, unsigned &pc) {
 	}
 	// any remaining data...
 	while (i < data.size()) {
-		printf("\t.byte\t$%02x\n", data[i]);
+		printf("\tbyte\t$%02x\n", data[i]);
 		++i;
 		++pc;
 	}
