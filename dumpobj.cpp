@@ -437,6 +437,7 @@ void dump_obj(const char *name, int fd)
 			case REC_SECT: {
 
 				d.flush();
+				d.set_pc(0);
 				uint8_t sec = read_8(iter);
 				printf("\t.sect\t%d\n", sec);
 				if (sec != section) {
@@ -510,7 +511,7 @@ void dump_obj(const char *name, int fd)
 
 
 	// symbol info
-
+#if 0
 	printf("\nSymbols\n");
 
 	iter = symbol_data.begin();
@@ -541,7 +542,7 @@ void dump_obj(const char *name, int fd)
 			printf("offset: %04x\n", offset);
 
 	}
-
+#endif
 
 }
 

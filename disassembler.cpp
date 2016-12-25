@@ -338,6 +338,11 @@ void disassembler::reset() {
 	_st = 0;
 }
 void disassembler::dump() {
+
+	if (!_st) return;
+
+	hexdump();
+
 	printf("\tbyte\t");
 
 	for (unsigned i = 0; i < _st; ++i) {
@@ -352,6 +357,10 @@ void disassembler::dump() {
 void disassembler::dump(const std::string &expr, unsigned size) {
 	if (_st) dump();
 
+	for (_st = 0; _st < size; ++_st) _bytes[_st] = 0;
+
+	hexdump();
+
 	switch(size) {
 		case 1: printf("\tbyte\t"); break;
 		case 2: printf("\tword\t"); break;
@@ -360,24 +369,54 @@ void disassembler::dump(const std::string &expr, unsigned size) {
 		default: printf("\t%d bytes\t", size);
 	}
 	printf("%s\n", expr.c_str());
-	_pc += _size;
+	_pc += _st;
 	reset();
-}
-
-void disassembler::code(const std::string &expr, unsigned size) {
-	if (_st != 1 || size != _size) {
-		dump(expr, size);
-		return;
-	}
-
-	print(expr);
 }
 
 void disassembler::flush() {
 	if (_st) dump();
 }
 
+void disassembler::data(uint8_t byte) {
+	if (_type == 0) {
+		flush();
+		_type = 1;
+	}
+	_bytes[_st++] = byte;
+	if (_st == 4) dump();
+}
+
+
+void disassembler::data(const std::string &expr, unsigned size) {
+	if (_type == 0 || _st) {
+		flush();
+		_type = 1;
+	}
+
+	dump(expr, size);
+}
+
+
+
+
+void disassembler::code(const std::string &expr, unsigned size) {
+
+	if (_type) { flush(); _type = 0; }
+
+	if (_st != 1 || size != _size) {
+		dump(expr, size);
+		return;
+	}
+	for(int i = 0; i < size; ++i) _bytes[_st++] = 0;
+	print(expr);
+}
+
+
+
 void disassembler::code(uint8_t byte) {
+
+	if (_type) { flush(); _type = 0; }
+
 	_bytes[_st++] = byte;
 	if (_st == 1) {
 		_op = byte;
@@ -460,7 +499,22 @@ void disassembler::print_suffix() {
 
 }
 
+void disassembler::hexdump() {
+	// print pc and hexdump...
+	int i;
+	printf("%04x:", _pc);
+	for (i = 0; i < _st; ++i) {
+		printf(" %02x", _bytes[i]);
+	}
+	for ( ; i < 4; ++i) {
+		printf("   ");
+	}	
+}
+
 void disassembler::print() {
+
+	hexdump();
+
 	printf("\t%.3s", &opcodes[_op * 3]);
 
 	print_prefix();
@@ -481,6 +535,9 @@ void disassembler::print() {
 }
 
 void disassembler::print(const std::string &expr) {
+
+	hexdump();
+
 	printf("\t%.3s", &opcodes[_op * 3]);
 
 	print_prefix();
