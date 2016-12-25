@@ -9,14 +9,14 @@ class disassembler {
 	public:
 		disassembler() = default;
 
-		void process(uint8_t byte);
-		void process(const std::string &expr, unsigned size);
+		void code(uint8_t byte);
+		void code(const std::string &expr, unsigned size);
 
 		template<class Iter>
-		void process(Iter begin, Iter end) { while (begin != end) process(*begin++); }
+		void code(Iter begin, Iter end) { while (begin != end) code(*begin++); }
 
 		template<class T>
-		void process(const T &t) { process(std::begin(t), std::end(t)); }
+		void code(const T &t) { code(std::begin(t), std::end(t)); }
 
 		bool m() const { return _flags & 0x20; }
 		bool x() const { return _flags & 0x10; }

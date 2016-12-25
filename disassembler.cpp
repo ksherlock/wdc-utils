@@ -364,7 +364,7 @@ void disassembler::dump(const std::string &expr, unsigned size) {
 	reset();
 }
 
-void disassembler::process(const std::string &expr, unsigned size) {
+void disassembler::code(const std::string &expr, unsigned size) {
 	if (_st != 1 || size != _size) {
 		dump(expr, size);
 		return;
@@ -377,7 +377,7 @@ void disassembler::flush() {
 	if (_st) dump();
 }
 
-void disassembler::process(uint8_t byte) {
+void disassembler::code(uint8_t byte) {
 	_bytes[_st++] = byte;
 	if (_st == 1) {
 		_op = byte;

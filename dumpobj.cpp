@@ -278,7 +278,7 @@ void dump_obj(const char *name, int fd)
 		if (op < 0xf0) {
 			auto end = iter + op;
 			while (iter != end) {
-				d.process(*iter++);
+				d.code(*iter++);
 				place_labels(labels, d.pc());
 			}
 			continue;
@@ -357,7 +357,7 @@ void dump_obj(const char *name, int fd)
 						}
 					}
 					if (stack.size() != 1) errx(EX_DATAERR, "%s stack overflow error.", name);
-					d.process(stack.front(), bytes);
+					d.code(stack.front(), bytes);
 				}
 				break;
 
