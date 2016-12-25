@@ -182,6 +182,19 @@ symbol find_symbol(const std::vector<symbol> &symbols, unsigned section, unsigne
 }
 
 
+void place_labels(std::vector<symbol> &labels, uint32_t pc) {
+	while (!labels.empty()) {
+		auto &label = labels.back();
+		if (label.offset > pc) return;
+		if (label.offset == pc) {
+			printf("%s:\n", label.name.c_str());
+		} else {
+			warnx("Unable to place label %s (offset $%04x)", label.name.c_str(), label.offset);
+		}
+		labels.pop_back();
+	}
+}
+
 void dump_obj(const char *name, int fd)
 {
 	static const char *sections[] = { "PAGE0", "CODE", "KDATA", "DATA", "UDATA" };
@@ -249,7 +262,7 @@ void dump_obj(const char *name, int fd)
 
 	unsigned section = 1; // default section = CODE.
 	std::vector<symbol> labels = labels_for_section(symbols, section);
-
+	//uint32_t label_pc = labels.empty() ? 0xffff : labels.back().offset;
 
 	uint8_t op = REC_END;
 
@@ -258,16 +271,16 @@ void dump_obj(const char *name, int fd)
 	auto iter = data.begin();
 	while (iter != data.end()) {
 
-		while (!labels.empty() && labels.back().offset == d.pc()) {
-			printf("%s:\n", labels.back().name.c_str());
-			labels.pop_back();
-		}
+		place_labels(labels, d.pc());
 
 		op = read_8(iter);
 		if (op == 0) break;
 		if (op < 0xf0) {
-			d.process(iter, iter + op);
-			iter += op;
+			auto end = iter + op;
+			while (iter != end) {
+				d.process(*iter++);
+				place_labels(labels, d.pc());
+			}
 			continue;
 		}
 
@@ -449,6 +462,15 @@ void dump_obj(const char *name, int fd)
 				errx(EX_DATAERR, "%s: unknown opcode %02x", name, op);
 		}
 	}
+
+	place_labels(labels, d.pc());
+
+
+	for(auto &label : labels) {
+		warnx("Unable to place label %s (offset $%04x)", label.name.c_str(), label.offset);
+	}
+
+
 
 	if (iter != data.end() || op != REC_END) errx(EX_DATAERR, "%s records ended early", name);
 
