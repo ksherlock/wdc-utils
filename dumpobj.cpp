@@ -15,6 +15,10 @@
 #include "obj816.h"
 #include "disassembler.h"
 
+#ifndef O_BINARY
+#define O_BINARY 0
+#endif
+
 enum class endian {
 	little = __ORDER_LITTLE_ENDIAN__,
 	big = __ORDER_BIG_ENDIAN__,
@@ -407,26 +411,38 @@ void dump_obj(const char *name, int fd)
 								break;
 							case D_C_FILE: {
 								std::string s = read_cstring(iter);
-								uint16_t line = read_16(iter); 
-								printf("\t.file\t\"%s\",%d\n", s.c_str(), line);
+								uint16_t line = read_16(iter);
+								i += 2;
+								i += s.length() + 1;
+								printf("\t.file\t\"%s\", %d\n", s.c_str(), line);
 								break;
 							}
 							case D_C_LINE: {
 								uint16_t line = read_16(iter);
 								printf("\t.line\t%d\n", line);
+								i += 2;
 								break;
 							}
 							case D_C_BLOCK: {
 								uint16_t block = read_16(iter);
 								printf("\t.block\t%d\n", block);
+								i += 2;
 								break;
 							}
+							case D_C_FUNC: {
+								uint16_t arg = read_16(iter);
+								printf("\t.function\t%d\n", arg);
+								i += 2;
+								break;								
+							}
+							/*
 							case D_C_SYM: {
 								break;
 							}
+							*/
 
 							default:
-								errx(EX_DATAERR, "%s: unknown debug opcode %02x", name, op);
+								errx(EX_DATAERR, "%s: unknown debug opcode %02x (%d)", name, op, op);
 								break;
 
 						}
@@ -619,7 +635,7 @@ void dump(const char *name) {
 	int fd;
 	ssize_t ok;
 
-	fd = open(name, O_RDONLY);
+	fd = open(name, O_RDONLY | O_BINARY);
 	if (fd < 0) err(EX_NOINPUT, "Unable to open %s", name);
 
 
