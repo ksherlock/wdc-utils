@@ -33,25 +33,18 @@
 #ifndef _ERR_H_
 #define	_ERR_H_
 
-/*
- * Don't use va_list in the err/warn prototypes.   Va_list is typedef'd in two
- * places (<machine/varargs.h> and <machine/stdarg.h>), so if we include one
- * of them here we may collide with the utility's includes.  It's unreasonable
- * for utilities to have to include one of them to include err.h, so we get
- * __va_list from <sys/_types.h> and use it.
- */
 #include <crtdefs.h>
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-void	err(int, const char *, ...);
-void	verr(int, const char *, va_list);
-void	errc(int, int, const char *, ...);
-void	verrc(int, int, const char *, va_list);
-void	errx(int, const char *, ...);
-void	verrx(int, const char *, va_list);
+void	err(int, const char *, ...) __MINGW_ATTRIB_NORETURN;
+void	verr(int, const char *, va_list) __MINGW_ATTRIB_NORETURN;
+void	errc(int, int, const char *, ...) __MINGW_ATTRIB_NORETURN;
+void	verrc(int, int, const char *, va_list) __MINGW_ATTRIB_NORETURN;
+void	errx(int, const char *, ...) __MINGW_ATTRIB_NORETURN;
+void	verrx(int, const char *, va_list) __MINGW_ATTRIB_NORETURN;
 void	warn(const char *, ...);
 void	vwarn(const char *, va_list);
 void	warnc(int, const char *, ...);
