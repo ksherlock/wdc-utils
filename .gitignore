@@ -1,0 +1,3 @@
+*.o
+dumpobj
+dumpobj.exe
