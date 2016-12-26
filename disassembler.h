@@ -9,23 +9,18 @@ class disassembler {
 	public:
 		disassembler() = default;
 
-		void code(uint8_t byte);
-		void code(const std::string &expr, unsigned size);
+		void operator()(uint8_t byte);
+		void operator()(const std::string &expr, unsigned size);
 
 		template<class Iter>
-		void code(Iter begin, Iter end) { while (begin != end) code(*begin++); }
+		void operator()(Iter begin, Iter end) { while (begin != end) code(*begin++); }
 
 		template<class T>
-		void code(const T &t) { code(std::begin(t), std::end(t)); }
-
-
-		void data(uint8_t byte);
-		void data(const std::string &expr, unsigned size);
+		void operator()(const T &t) { code(std::begin(t), std::end(t)); }
 
 
 		bool m() const { return _flags & 0x20; }
 		bool x() const { return _flags & 0x10; }
-		uint32_t pc() const { return _pc; }
 
 		void set_m(bool x) {
 			if (x) _flags |= 0x20;
@@ -37,9 +32,15 @@ class disassembler {
 			else _flags &= ~0x10;
 		}
 
-		void set_pc(uint32_t pc) { _pc = pc; }
+		uint32_t pc() const { return _pc; }
+		void set_pc(uint32_t pc) { if (_pc != pc) { flush(); _pc = pc; } }
+
+		bool code() const { return _code; }
+		void set_code(bool code) { if (_code != code) { flush(); _code = code; } }
 
 		void flush();
+
+
 
 	private:
 
@@ -65,7 +66,7 @@ class disassembler {
 		unsigned _pc = 0;
 		unsigned _arg = 0;
 
-		unsigned _type = 0; // code / data.
+		bool _code = true;
 };
 
 #endif

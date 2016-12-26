@@ -377,31 +377,13 @@ void disassembler::flush() {
 	if (_st) dump();
 }
 
-void disassembler::data(uint8_t byte) {
-	if (_type == 0) {
-		flush();
-		_type = 1;
+
+void disassembler::operator()(const std::string &expr, unsigned size) {
+
+	if (!_code) {
+		dump(expr, size);
+		return;
 	}
-	_bytes[_st++] = byte;
-	if (_st == 4) dump();
-}
-
-
-void disassembler::data(const std::string &expr, unsigned size) {
-	if (_type == 0 || _st) {
-		flush();
-		_type = 1;
-	}
-
-	dump(expr, size);
-}
-
-
-
-
-void disassembler::code(const std::string &expr, unsigned size) {
-
-	if (_type) { flush(); _type = 0; }
 
 	if (_st != 1 || size != _size) {
 		dump(expr, size);
@@ -413,9 +395,13 @@ void disassembler::code(const std::string &expr, unsigned size) {
 
 
 
-void disassembler::code(uint8_t byte) {
+void disassembler::operator()(uint8_t byte) {
 
-	if (_type) { flush(); _type = 0; }
+	if (!_code) {
+		_bytes[_st++] = byte;
+		if (_st == 4) dump();
+		return;
+	}
 
 	_bytes[_st++] = byte;
 	if (_st == 1) {

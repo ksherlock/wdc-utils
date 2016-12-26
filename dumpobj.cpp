@@ -199,7 +199,7 @@ void place_labels(std::vector<symbol> &labels, uint32_t pc) {
 	}
 }
 
-void dump_obj(const char *name, int fd)
+bool dump_obj(const char *name, int fd)
 {
 	static const char *sections[] = { "PAGE0", "CODE", "KDATA", "DATA", "UDATA" };
 	static const char *types[] = { "S_UND", "S_ABS", "S_REL", "S_EXP", "S_REG", "S_FREG" };
@@ -208,6 +208,8 @@ void dump_obj(const char *name, int fd)
 	ssize_t ok;
 
 	ok = read(fd, &h, sizeof(h));
+	if (ok == 0) return false;
+
 	if (ok != sizeof(h))
 		errx(EX_DATAERR, "%s is not an object file", name);
 
@@ -272,6 +274,9 @@ void dump_obj(const char *name, int fd)
 
 	disassembler d;
 
+	d.set_pc(0);
+	d.set_code(true);
+
 	auto iter = data.begin();
 	while (iter != data.end()) {
 
@@ -282,7 +287,7 @@ void dump_obj(const char *name, int fd)
 		if (op < 0xf0) {
 			auto end = iter + op;
 			while (iter != end) {
-				d.code(*iter++);
+				d(*iter++);
 				place_labels(labels, d.pc());
 			}
 			continue;
@@ -361,7 +366,7 @@ void dump_obj(const char *name, int fd)
 						}
 					}
 					if (stack.size() != 1) errx(EX_DATAERR, "%s stack overflow error.", name);
-					d.code(stack.front(), bytes);
+					d(stack.front(), bytes);
 				}
 				break;
 
@@ -459,6 +464,7 @@ void dump_obj(const char *name, int fd)
 				if (sec != section) {
 					section = sec;
 					labels = labels_for_section(symbols, section);
+					d.set_code(section == 1 || section > 4);
 				}
 				break;
 			}
@@ -471,7 +477,14 @@ void dump_obj(const char *name, int fd)
 				break;
 			}
 
-			case REC_SPACE:
+			case REC_SPACE: {
+				d.flush();
+				uint16_t count = read_32(iter);
+				printf("\tds\t$%04x\n", count);
+				d.set_pc(d.pc() + count);
+				break;
+			}
+
 			case REC_RELEXP:
 			case REC_LINE:
 			default:
@@ -559,7 +572,7 @@ void dump_obj(const char *name, int fd)
 
 	}
 #endif
-
+	return true;
 }
 
 
@@ -623,11 +636,6 @@ void dump_lib(const char *name, int fd)
 	}
 	printf("\n");
 
-	for (int i = 0; i < h.l_numfiles; ++i) {
-		dump_obj(name, fd);
-	}
-
-
 }
 
 void dump(const char *name) {
@@ -651,8 +659,10 @@ void dump(const char *name) {
 		errx(EX_DATAERR, "%s is not an object file", name);
 
 	lseek(fd, 0, SEEK_SET);
-	if (h.h_filtyp == 1) dump_obj(name, fd);
-	else dump_lib(name, fd);
+	if (h.h_filtyp == 2) dump_lib(name, fd);
+
+	// files may contain multiple modules.
+	while (dump_obj(name, fd)) /* ... */;
 
 	close(fd);
 }
