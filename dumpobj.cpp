@@ -295,11 +295,15 @@ bool dump_obj(const char *name, int fd)
 
 		switch(op) {
 
+			case REC_RELEXP:
 			case REC_EXPR:
 				{
-					uint8_t bytes;
-					uint8_t op = 0;
-					bytes = read_8(iter);
+
+					// todo -- pass the relative flag to ()
+					// so it can verify it's appropriate for the opcode.
+
+					// todo -- move all this stuff to a separate function.
+					uint8_t size = read_8(iter);
 
 					char buffer[32];
 
@@ -310,7 +314,7 @@ bool dump_obj(const char *name, int fd)
 					// this ignores all precedence...
 
 					for(;;) {
-						op = read_8(iter);
+						uint8_t op = read_8(iter);
 						if (op == OP_END) break;
 						switch (op) {
 							case OP_LOC: {
@@ -346,12 +350,28 @@ bool dump_obj(const char *name, int fd)
 								break;
 							}
 
+							// unary operatos
+							case OP_NOT:
+							case OP_NEG:
+							case OP_FLP: {
+								static const char *ops[] = {
+									".NOT.", "-", "/" // ?
+								};
+
+								if (stack.empty()) errx(EX_DATAERR, "%s : stack underflow error", name);
+								std::string a = std::move(stack.back()); stack.pop_back();
+								std::string b(ops[op-10]);
+								stack.emplace_back(b + a);
+								break;
+							}
+
+							// binary operators
 							case OP_SHR: 
 							case OP_SHL:
 							case OP_ADD: 
 							case OP_SUB: {
 								static const char *ops[] = {
-									"**", "*", "/", "%", ">>", "<<", "+", "-", "&", "|", "^", "=", ">", "<"
+									"**", "*", "/", ".MOD.", ">>", "<<", "+", "-", "&", "|", "^", "=", ">", "<"
 
 								};
 								if (stack.size() < 2) errx(EX_DATAERR, "%s : stack underflow error", name);
@@ -366,7 +386,7 @@ bool dump_obj(const char *name, int fd)
 						}
 					}
 					if (stack.size() != 1) errx(EX_DATAERR, "%s stack overflow error.", name);
-					d(stack.front(), bytes);
+					d(stack.front(), size);
 				}
 				break;
 
@@ -456,7 +476,6 @@ bool dump_obj(const char *name, int fd)
 				break;
 
 			case REC_SECT: {
-
 				d.flush();
 				d.set_pc(0);
 				uint8_t sec = read_8(iter);
@@ -468,8 +487,8 @@ bool dump_obj(const char *name, int fd)
 				}
 				break;
 			}
-			case REC_ORG: {
 
+			case REC_ORG: {
 				d.flush();
 				uint32_t org = read_32(iter);
 				printf("\t.org\t$%04x\n", org);
@@ -479,14 +498,18 @@ bool dump_obj(const char *name, int fd)
 
 			case REC_SPACE: {
 				d.flush();
-				uint16_t count = read_32(iter);
+				uint16_t count = read_16(iter);
 				printf("\tds\t$%04x\n", count);
 				d.set_pc(d.pc() + count);
 				break;
 			}
 
-			case REC_RELEXP:
-			case REC_LINE:
+			case REC_LINE: {
+				d.flush();
+				uint16_t line = read_16(iter);
+				printf("\t.line\t%d\n", line);
+				break;
+			}
 			default:
 				d.flush();
 				errx(EX_DATAERR, "%s: unknown opcode %02x", name, op);
