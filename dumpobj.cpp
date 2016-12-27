@@ -274,6 +274,9 @@ bool dump_obj(const char *name, int fd)
 
 	disassembler d;
 
+	unsigned line = 0;
+	std::string file;
+
 	d.set_pc(0);
 	d.set_code(true);
 
@@ -415,7 +418,8 @@ bool dump_obj(const char *name, int fd)
 					uint16_t size = read_16(iter);
 					//printf("\t;DEBUG\n");
 
-					for (unsigned i = 0; i < size; ++i) {
+					auto end = iter + size;
+					while (iter < end) {
 						uint8_t op = read_8(iter);
 						switch(op) {
 							case D_LONGA_ON:
@@ -435,29 +439,24 @@ bool dump_obj(const char *name, int fd)
 								printf("\tlongi\toff\n");
 								break;
 							case D_C_FILE: {
-								std::string s = read_cstring(iter);
-								uint16_t line = read_16(iter);
-								i += 2;
-								i += s.length() + 1;
-								printf("\t.file\t\"%s\", %d\n", s.c_str(), line);
+								file = read_cstring(iter);
+								line = read_16(iter);
+								printf("\t.file\t\"%s\", %d\n", file.c_str(), line);
 								break;
 							}
 							case D_C_LINE: {
-								uint16_t line = read_16(iter);
+								line = read_16(iter);
 								printf("\t.line\t%d\n", line);
-								i += 2;
 								break;
 							}
 							case D_C_BLOCK: {
 								uint16_t block = read_16(iter);
 								printf("\t.block\t%d\n", block);
-								i += 2;
 								break;
 							}
 							case D_C_FUNC: {
 								uint16_t arg = read_16(iter);
 								printf("\t.function\t%d\n", arg);
-								i += 2;
 								break;								
 							}
 							/*
@@ -505,9 +504,9 @@ bool dump_obj(const char *name, int fd)
 			}
 
 			case REC_LINE: {
+				// bump line counter, no argument.
 				d.flush();
-				uint16_t line = read_16(iter);
-				printf("\t.line\t%d\n", line);
+				++line;
 				break;
 			}
 			default:
