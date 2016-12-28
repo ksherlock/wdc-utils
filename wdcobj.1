@@ -1,0 +1,80 @@
+.Dd December 28, 2016
+.Dt WDCOBJ 1
+.Os
+.Sh NAME
+.Nm wdcobj
+.Nd Examine object modules
+.Sh SYNOPSIS
+.Nm
+.Op Fl D
+.Op Fl L
+.Op Fl R
+.Op Fl S
+.Ar objfile
+.Sh DESCRIPTION
+The
+.Nm
+utility provides a means to examine object modules created by the 
+.Nm WDCxAS
+assembler. 
+.Nm
+will print out the size and type of each section defined in the module, the
+names of all symbols defined or referenced by the object module, and if
+desired, each of the data records in the file. The
+.Nm
+utility is of limited usefulness to the typical programmer and is included
+for completeness. Options allow control of the information displayed.
+.Sh OPTIONS
+.Bl -tag -width indent
+.It Fl D
+This option causes display of any source debug information records present
+in the object module. The appropriate options must have been specified when
+compiling or assembling for debug information to be present. The default is
+to NOT display debug information.
+.It Fl L
+Normally, when the records are displayed, all the data in the record is
+displayed in hexadecimal format. When option 
+.Fl L
+is specified, the data in the record is not displayed. This option is useful
+for examining the structure of a file without displaying all the individual
+data.
+.Pp
+To examine the individual records in an object module but without seeing all
+of the data bytes, use the command:
+.Pp
+.Dl WDCOBJ -L PROG.OBJ
+.Pp
+.It Fl R
+This option causes display of each of the individual records in the object
+module. Information about the object file format is available on request.
+.Pp
+To examine the individual records in an object module, use the command:
+.Pp
+.Dl WDCOBJ -R PROG.OBJ
+.Pp
+.It Fl S
+Normally, when
+.Nm
+is run, the information for the sections is followed by the symbol
+information. When the 
+.Fl S
+option is specified, the symbol information is suppressed.
+.Pp
+The following command displays just the section names and types of all
+modules in the file 
+.Ar PROG.OBJ :
+.Pp
+.Dl WDCOBJ -S PROG.OBJ
+.Pp
+.Sh SEE ALSO
+.Xr wdc02as 1 ,
+.Xr wdc02cc 1 ,
+.Xr wdc02op 1 ,
+.Xr wdc816as 1 ,
+.Xr wdc816cc 1 ,
+.Xr wdc816op 1 ,
+.Xr wdcdb 1 ,
+.Xr wdcln 1 ,
+.Xr wdclib 1 ,
+.\" .Xr wdcobj 1 ,
+.Xr wdcsym 1
