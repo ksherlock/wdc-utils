@@ -138,11 +138,42 @@ std::string read_pstring(T &iter) {
 
 struct symbol {
 	std::string name;
-	uint8_t type;
-	uint8_t flags;
-	uint8_t section;
-	uint32_t offset;
+	uint8_t type = S_UND;
+	uint8_t flags = 0;
+	uint8_t section = 0xff;
+	uint32_t offset = 0;
 };
+
+struct section {
+	std::string name;
+	uint8_t number = 0;
+	uint8_t flags = 0;
+	uint32_t size = 0;
+	uint32_t org = 0;
+	uint32_t pc = 0;
+};
+
+std::vector<section> read_sections(const std::vector<uint8_t> &section_data) {
+
+	std::vector<section> sections;
+	auto iter = section_data.begin();
+	while (iter != section_data.end()) {
+
+		section s;
+
+		s.number = read_8(iter);
+		s.flags = read_8(iter);
+		s.size = read_32(iter);
+		s.org = read_32(iter);
+
+		if (!(s.flags & SEC_NONAME)) s.name = read_cstring(iter);
+
+		if (sections.size() < s.number) sections.resize(s.number);
+		if (sections.size() == s.number) sections.emplace_back(std::move(s));
+		else sections[s.number] = std::move(s);
+	}
+	return sections;
+}
 
 
 std::vector<symbol> read_symbols(const std::vector<uint8_t> &symbol_data) {
@@ -151,14 +182,15 @@ std::vector<symbol> read_symbols(const std::vector<uint8_t> &symbol_data) {
 
 	auto iter = symbol_data.begin();
 	while (iter != symbol_data.end()) {
-		uint8_t type = read_8(iter);
-		uint8_t flags = read_8(iter);
-		uint8_t section = read_8(iter);
-		uint32_t offset = type == S_UND ? 0 : read_32(iter);
-		std::string name = read_cstring(iter);
+		symbol s;
+		s.type = read_8(iter);
+		s.flags = read_8(iter);
+		s.section = read_8(iter);
+		s.offset = s.type == S_UND ? 0 : read_32(iter);
+		s.name = read_cstring(iter);
 
 
-		symbols.emplace_back(symbol{name, type, flags, section, offset});
+		symbols.emplace_back(std::move(s));
 	}
 
 	return symbols;
@@ -182,7 +214,7 @@ symbol find_symbol(const std::vector<symbol> &symbols, unsigned section, unsigne
 		return s.section == section && s.offset == offset && s.type != S_UND;
 	});
 	if (iter != symbols.end()) return *iter;
-	return symbol{"", S_UND, 0, 0xff, 0};
+	return symbol{};
 }
 
 
@@ -201,8 +233,8 @@ void place_labels(std::vector<symbol> &labels, uint32_t pc) {
 
 bool dump_obj(const char *name, int fd)
 {
-	static const char *sections[] = { "PAGE0", "CODE", "KDATA", "DATA", "UDATA" };
-	static const char *types[] = { "S_UND", "S_ABS", "S_REL", "S_EXP", "S_REG", "S_FREG" };
+	static const char *kSections[] = { "PAGE0", "CODE", "KDATA", "DATA", "UDATA" };
+	static const char *kTypes[] = { "S_UND", "S_ABS", "S_REL", "S_EXP", "S_REG", "S_FREG" };
 
 	Mod_head h;
 	ssize_t ok;
@@ -265,20 +297,23 @@ bool dump_obj(const char *name, int fd)
 	if (ok != h.h_symsize) errx(EX_DATAERR, "%s symbols truncated", name);
 
 	std::vector<symbol> symbols = read_symbols(symbol_data);
-
-	unsigned section = 1; // default section = CODE.
-	std::vector<symbol> labels = labels_for_section(symbols, section);
-	//uint32_t label_pc = labels.empty() ? 0xffff : labels.back().offset;
-
-	uint8_t op = REC_END;
+	std::vector<section> sections = read_sections(section_data);
 
 	disassembler d;
 
+	uint8_t op = REC_END;
+	unsigned section = SECT_CODE; // default section = CODE
 	unsigned line = 0;
 	std::string file;
 
+	if (sections.size() < 5) sections.resize(5);
+	for (int i = 0; i < 5; ++i) 
+		if (sections[i].name.empty()) sections[i].name = kSections[i];
+
 	d.set_pc(0);
 	d.set_code(true);
+
+	std::vector<symbol> labels = labels_for_section(symbols, section);
 
 	auto iter = data.begin();
 	while (iter != data.end()) {
@@ -324,17 +359,26 @@ bool dump_obj(const char *name, int fd)
 								uint8_t section = read_8(iter);
 								uint32_t offset = read_32(iter);
 
+								std::string name;
+
 								symbol s = find_symbol(symbols, section, offset);
 								if (s.type) {
-									stack.push_back(s.name);
+									name = s.name;
 								} else {
 
-									if (section < sizeof(sections) / sizeof(sections[0]))
-										snprintf(buffer, sizeof(buffer), "%s+$%04x", sections[section], offset);
-									else
-										snprintf(buffer, sizeof(buffer), "section %02x+$%04x", section, offset);
-									stack.push_back(buffer);
+									if (section < sizeof(kSections) / sizeof(kSections[0]))
+										name = kSections[section];
+									else {
+										snprintf(buffer, sizeof(buffer), "section%d", section);
+										name = buffer;
+									}
 								}
+								if (offset) {
+									snprintf(buffer, sizeof(buffer), "+$%04x", offset);
+									name += buffer;
+								}
+								stack.push_back(name);
+
 								break;
 							}
 
@@ -358,7 +402,7 @@ bool dump_obj(const char *name, int fd)
 							case OP_NEG:
 							case OP_FLP: {
 								static const char *ops[] = {
-									".NOT.", "-", "/" // ?
+									".NOT.", "-", "\\"
 								};
 
 								if (stack.empty()) errx(EX_DATAERR, "%s : stack underflow error", name);
@@ -476,11 +520,12 @@ bool dump_obj(const char *name, int fd)
 
 			case REC_SECT: {
 				d.flush();
-				d.set_pc(0);
 				uint8_t sec = read_8(iter);
 				printf("\t.sect\t%d\n", sec);
 				if (sec != section) {
+					sections[section].pc = d.pc();
 					section = sec;
+					d.set_pc(sections[section].pc);
 					labels = labels_for_section(symbols, section);
 					d.set_code(section == 1 || section > 4);
 				}
@@ -531,33 +576,26 @@ bool dump_obj(const char *name, int fd)
 
 	printf("\nSections\n");
 
-	iter = section_data.begin();
-	while (iter != section_data.end()) {
+	for(const auto &s : sections) {
+		if (s.size) {
 
+			printf("section %d\n", s.number);
+			if (!(s.flags & SEC_NONAME))
+				printf("name: %s\n", s.name.c_str());
+			printf("flags: %02x ", s.flags);
 
-		uint8_t number = read_8(iter);
-		uint8_t flags = read_8(iter);
-		uint32_t size = read_32(iter);
-		uint32_t org = read_32(iter);
+	#undef _
+	#define _(x) if (s.flags & x) fputs(#x " ", stdout)
+			_(SEC_OFFSET);
+			_(SEC_INDIRECT);
+			_(SEC_STACKED);
+			_(SEC_REF_ONLY);
+			_(SEC_CONST);
+			_(SEC_DIRECT);
+			_(SEC_NONAME);
+			fputs("\n", stdout);
 
-		printf("section %d\n", number);
-		printf("flags: %02x ", flags);
-
-#undef _
-#define _(x) if (flags & x) fputs(#x " ", stdout)
-		_(SEC_OFFSET);
-		_(SEC_INDIRECT);
-		_(SEC_STACKED);
-		_(SEC_REF_ONLY);
-		_(SEC_CONST);
-		_(SEC_DIRECT);
-		_(SEC_NONAME);
-		fputs("\n", stdout);
-
-		// todo -- section name -- cstring?
-		//assert(flags & SEC_NONAME);
-		std::string s;
-		if (!(flags & SEC_NONAME)) s = read_cstring(iter);
+		}
 	}
 
 
@@ -574,7 +612,7 @@ bool dump_obj(const char *name, int fd)
 		std::string name = read_cstring(iter);
 
 		printf("name : %s\n", name.c_str());
-		printf("type : $%02x %s\n", type, type < sizeof(types) / sizeof(types[0]) ? types[type] : "");
+		printf("type : $%02x %s\n", type, type < sizeof(kTypes) / sizeof(kTypes[0]) ? kTypes[type] : "");
 		printf("flags: $%02x ", flags);
 #undef _
 #define _(x) if (flags & x) fputs(#x " ", stdout)
