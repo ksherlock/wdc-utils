@@ -383,6 +383,14 @@ are:
 and
 .Fl Z Ns Ar data Ns = .
 .El
+.Sh ENVIRONMENT
+The following environment variables affect the execution of
+.Nm :
+.Bl -tag -width indent
+.It Ev WDC_LIB
+A semi-colon separated list of directories to search if an
+input file cannot be found in the current directory.
+.El
 .Sh SEE ALSO
 .Xr wdc02as 1 ,
 .Xr wdc02cc 1 ,

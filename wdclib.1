@@ -40,7 +40,7 @@ are given, the default is to assume option
 .Fl A .
 To create a library from a set of object files, use the command:
 .Pp
-.Dl WDCLIB -A MYLIB.LIB LIBSRC1.OBJ LIBSRC2.OBJ LIBSRC3.OBJ
+.Dl Nm Fl A Ar MYLIB.LIB Ar LIBSRC1.OBJ Ar LIBSRC2.OBJ Ar LIBSRC3.OBJ
 .Pp
 which will create a library file called 
 .Ar MYLIB.LIB
@@ -57,7 +57,7 @@ with new ones.
 The following example shows how to remove the modules associated with an
 object file.
 .Pp
-.Dl WDCLIB -D MYLIB.LIB LIBSRC3.OBJ
+.Dl Nm Fl D Ar MYLIB.LIB Ar LIBSRC3.OBJ
 .Pp
 All of the modules associated with the file
 .Ar LIBSRC3.OBJ
@@ -65,8 +65,8 @@ will be deleted from the library.
 .Pp
 This example shows how to replace a file in a library.
 .Pp
-.Dl WDCLIB -D MYLIB.LIB LIBSRC2.OBJ
-.Dl WDCLIB -A MYLIB.LIB LIBSRC2.OBJ
+.Dl Nm Fl D Ar MYLIB.LIB Ar LIBSRC2.OBJ
+.Dl Nm Fl A Ar MYLIB.LIB Ar LIBSRC2.OBJ
 .Pp
 The modules associated with 
 .Ar LIBSRC2.OBJ
@@ -84,8 +84,8 @@ For example, these commands add all files with a
 .Ar .OBJ
 extension to the library.
 .Pp
-.Dl DIR *.OBJ > OBJLIST
-.Dl WDCLIB -A MYLIB.LIB -F OBJLIST
+.Dl Nm DIR Ar *.OBJ > Pa OBJLIST
+.Dl Nm Fl A Ar MYLIB.LIB Fl F Ar OBJLIST
 .It Fl L
 This option causes a list of the files in the library to be printed.
 Associated with each file name is a file number. This number will also
@@ -93,11 +93,11 @@ appear in the symbol listing which indicates which file contains the
 module that defines that symbol. This command will display the names
 of all files added to a library.
 .Pp
-.Dl WDCLIB -L MYLIB.LIB
+.Dl Nm  Fl L Ar MYLIB.LIB
 .Pp
 This command adds two files to the library.
 .Pp
-.Dl WDCLIB -AL MYLIB.LIB LIBSRC1.OBJ LIBSRC2.OBJ
+.Dl Nm Fl AL Ar MYLIB.LIB Ar LIBSRC1.OBJ Ar LIBSRC2.OBJ
 .Pp
 After the files are added, a list of all the files in the library will
 be printed.
@@ -113,7 +113,7 @@ name. After extraction, the modules in the library are deleted.
 .Pp
 The following example extracts two files from a library.
 .Pp
-.Dl WDCLIB -X MYLIB.LIB LIBSRC3.OBJ LIBSRC1.OBJ
+.Dl Nm Fl X Ar MYLIB.LIB Ar LIBSRC3.OBJ Ar LIBSRC1.OBJ
 .El
 .Sh SEE ALSO
 .Xr wdc02as 1 ,
