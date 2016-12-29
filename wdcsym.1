@@ -3,12 +3,10 @@
 .Os
 .Sh NAME
 .Nm wdcsym
-.Nd Examine symbol tables
+.Nd Examine WDC symbol tables
 .Sh SYNOPSIS
 .Nm
-.Op Fl A
-.Op Fl L
-.Op Fl S
+.Op Fl ALS
 .Ar symfile
 .Sh DESCRIPTION
 The
@@ -46,7 +44,6 @@ The following command displays the section information, and symbols for all
 sections and the global symbols as well.
 .Pp
 .Dl WDCSYM -S PROG.SYM
-.Pp
 .El
 The basic structure of the file is outlined as follows:
 .Bl -inset -compact -offset indent

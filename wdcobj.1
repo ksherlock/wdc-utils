@@ -3,13 +3,10 @@
 .Os
 .Sh NAME
 .Nm wdcobj
-.Nd Examine object modules
+.Nd Examine WDC object modules
 .Sh SYNOPSIS
 .Nm
-.Op Fl D
-.Op Fl L
-.Op Fl R
-.Op Fl S
+.Op Fl DLRS
 .Ar objfile
 .Sh DESCRIPTION
 The
@@ -65,7 +62,7 @@ modules in the file
 .Ar PROG.OBJ :
 .Pp
 .Dl WDCOBJ -S PROG.OBJ
-.Pp
+.El
 .Sh SEE ALSO
 .Xr wdc02as 1 ,
 .Xr wdc02cc 1 ,

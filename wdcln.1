@@ -1,0 +1,397 @@
+.Dd December 28, 2016
+.Dt WDCLN 1
+.Os
+.Sh NAME
+.Nm wdclib
+.Nd WDC linker
+.Sh SYNOPSIS
+.Nm
+.Op Fl BEGNQTVWX
+.Op Fl Hxx
+.Op Fl Mxx
+.Op Fl Sxx
+.Op Fl O Ar output
+.Op Fl Zsec=XX,XX
+.Op Fl Asec=XX,XX
+.Op Fl C=XX,XX
+.Op Fl D=XX,XX
+.Op Fl K=XX,XX
+.Op Fl U=XX,XX
+.Op Fl F Ar argfile
+.Op Fl L Ar library
+.Op Ar objfile ...
+.Sh DESCRIPTION
+The WDC linker,
+.Nm ,
+reads one or more object files and/or libraries and merges them into a
+singleoutput file. References from one module to another are resolved
+during the link. The linker operates in two passes. In the first pass,
+each object module is scanned to determine what symbols are defined and
+what symbols are referenced. Symbols that are defined are entered into a
+symbol table. When other object modules want the address of a symbol they
+will look in the symbol table. If the symbol is not in the symbol table
+it is added to a list of undefined symbols. If a later module defines the
+symbol it is removed from the undefined list. If a library is encountered,
+it's dictionary is repeatedly scanned for any symbols that match any of
+the symbols in the undefined list. If such a symbol is found, the module
+that defines it is loaded from the library and its symbols are handled
+just like a normal object module. Through this process, only object modules
+that are needed are loaded from the library. Libraries are usually placed
+at the end of the list of object files. At the end of the first pass, all
+undefined symbol references should be resolved. During the second pass,
+the linker reads each object module a second time. As it reads each
+module, it generates the final output file based on the information in
+the object module.
+.Sh OPTIONS
+.Bl -tag -width indent
+.It Fl A
+This option is used to specify the relocation and ROM address of the named
+section. The option is followed by information in the following format:
+.Pp
+.Dl Fl A Ns Ar section Ns = Ns Op Ad XXXX Ns Op , Ns Ad XXXX
+.Pp
+where section is the name of the section to be located. The section name
+is followed by an 
+.Ql =
+sign which in turn is followed by the relocation
+address and ROM address separated by a comma. All addresses are assumed
+to be hexadecimal numbers. If the comma and ROM address are not present,
+it is assumed that the relocation address will be used for the ROM address
+as well. If the comma is present and either the relocation address or
+the ROM address is missing, then the specified address is assumed to be
+the end of the previously specified section.
+.It Fl B
+This option is used to create a file with the same root name as the output
+file and with the extension 
+.Pa .BNK .
+This file is similar to the map file and contains bank information.
+.It Fl C
+This option is used to specify the relocation address and the ROM address
+of the predefined CODE section. The format is:
+.Pp
+.Dl Fl C Ns Op Ad XXXX Ns Op , Ns Ad XXXX
+.Pp
+which is similar to the 
+.Fl A
+option without the section name.
+.It Fl D
+This option is used to specify the relocation address and the ROM address
+of the predefined DATA section. The format is:
+.Pp
+.Dl Fl D Ns Op Ad XXXX Ns Op , Ns Ad XXXX
+.Pp
+which is similar to the 
+.Fl A
+option without the section name.
+.It Fl E
+This option is used to create a file with the same root name as the output
+file and with the extension
+.Pa .ERR .
+This file contains any warnings or error messages generated during the link.
+.It Fl F
+This option causes the linker to continue reading options and file names
+from a file. When done, it then continues reading arguments from the command
+line. The name of the file follows the option 
+.Fl F .
+Lines beginning with a 
+.Ql #
+character are ignored. For example, the following
+command links 
+.Pa PROG.OBJ
+with
+.Pa SUB1.OBJ , ... , SUB4.OBJ ,
+and
+.Pa TC.LIB .
+It reads some arguments from the file
+.Pa PROG.LNK :
+.Pp
+.Dl Nm Pa PROG.OBJ Fl F Ar PROG.LNK Pa TC.LIB
+.Pp
+where
+.Pa PROG.LNK
+contains:
+.Bd -literal -offset indent
+-O PROG.OUT
+SUB1.OBJ
+SUB2.OBJ
+SUB3.OBJ
+SUB4.OBJ
+.Ed
+.Pp
+.Em WARNING:
+There is a limit of 5000 files for the source level information
+contained in reading file names from a file (Include files are counted
+in this total).
+.It Fl G
+This option tell the linker to generate source level information. When
+specified by itself with no additional symbol style option, the WDC symbol
+file format is generated. Otherwise, if the
+.Fl SN
+Extended MicroTek symbol format option is specified, the source information
+is added as special records.
+.It Fl H
+This option is used to select the format of the hex output file. Four formats
+are currently supported. The following table shows the name of the format,
+the option used to generate it, address field size.
+.Pp
+.Bl -column "Option" "File" "Size" "Format"
+.It Sy "Option" Ta Sy "File" Ta Sy "Size" Ta Sy "Format"
+.It Fl HB       Ta Pa .BIN   Ta --        Ta Straight Binary
+.It Fl HI       Ta Pa .HEX   Ta 16        Ta Intel Hex
+.It Fl HIE      Ta Pa .HEX   Ta 32        Ta Extended Intel Hex
+.It Fl HM19     Ta Pa .S19   Ta 16        Ta Motorola S19
+.It Fl HM28     Ta Pa .S28   Ta 24        Ta Motorola S28
+.It Fl HM37     Ta Pa .S37   Ta 32        Ta Motorola S37
+.It Fl HN       Ta Pa .ISX   Ta 24        Ta Nintendo Binary
+.It Fl HT       Ta Pa .TEK   Ta 16        Ta Tektronix Hex
+.It Fl HZ       Ta Pa .BIN   Ta 24        Ta WDC Binary
+.El
+.Pp
+The following binary format is generated if 
+.Fl HZ
+is specified to the linker:
+.Pp
+.Bl -inset -compact -offset indent
+.It Initial byte 'Z' as signature.
+.El
+Then for each block:
+.Bl -inset -compact -offset indent
+.It 3 byte address
+.It 3 byte length length bytes of data
+.It The final block has an address and length of 0.
+.It The default is Motorola S19.
+.El
+.It Fl J
+This option causes the module info to be placed in alphabetical order.
+By default, module info is sorted by section.
+.It Fl K
+This option is used to specify the relocation address and the ROM address
+of the predefined KDATA section. The format is:
+.Pp
+.Dl Fl K Ns Op Ad XXXX Ns Op , Ns Ad XXXX
+.Pp
+which is similar to the 
+.Fl A
+option without the section name.
+.It Fl L
+This option takes the following characters and adds 
+.Pa .LIB
+to form the name of the library. The default library directories specified
+in the
+.Ev WDC_LIB
+environment variable are then searched for the fully defined file name.
+.Pp
+For example, the command:
+.Pp
+.Dl Nm Fl J  Fl L Ns Ar CL
+.Pp
+will look for the file
+.Pa CL.LIB .
+.Pp
+.Em Note:
+The order of the libraries is important! The linker will pull in the
+functions it needs from the 
+.Em first
+library it sees. For example,
+the following command:
+.Pp
+.Dl Nm Pa Sample.obj Fl L Ns Ar MS Fl L Ns Ar CS
+.Pp
+will pull in the
+.Fn scanf
+and
+.Fn printf
+functions from the floating point library as it is specified first. This
+will result in larger code size! Therefore, If you are using floating
+point math, put 
+.Fl L Ns Ar MS
+before
+.Fl L Ns Ar CS
+so the proper functions are included.
+.Pp
+If you are NOT using floating point math, do not include
+.Fl L Ns Ar MS
+on the command line, or put it after
+.Fl L Ns Ar CS
+.Pp
+.Em Note:
+For the W65C02, use
+.Pa c.lib
+and/or
+.Pa m.lib .
+For the W65C816, use
+.Pa coc.lib , col.lib , com.lib , ms.lib , mm.lib , mc.lib , ml.lib ,
+.Pa cs.lib , cm.lib , cc.lib ,
+and/or
+.Pa cl.lib.
+.It Fl M
+This option is used to select a special machine mode. Currently, the only
+available machine modes are 
+.Fl MN , MN80 ,
+and
+.Fl MN21
+which stand for Nintendo, slow and fast, and Nintendo Mode 21 respectively.
+.It Fl N
+If this option is specified, the linker will not place any symbols defined
+in a 
+.Pa .QCK
+file into the symbol file. This is useful if the
+.Pa .QCK
+file is created from a large amount of data whose symbols are not required
+after linking. The symbol file can be significantly smaller if the data
+symbols are discarded.
+.It Fl O
+Option
+.Fl O
+can be used to specify the name of the file to which the linker is to
+write the executable program. The name of this file is in the parameter
+that follows
+.Fl O .
+For example, the following command writes the executable program to the
+file
+.Pa PROG.OUT :
+.Pp
+.Dl Nm Fl O Ar PROG.OUT Pa PROG.OBJ Pa TC.LIB
+.Pp
+If this option is not used, the linker derives the name of the executable
+file from that of the first input file with the extension changed to
+reflect the type of hex file being generated.
+.It Fl P
+This option sets the fill characters in the hex output file. The default,
+(no 
+.Fl P Ns No ),
+does not add any fill characters to the hex output file. If this option is
+specified as 
+.Fl PFF ,
+it will fill in the blank areas of the hex output file with
+.Li $FF Ns \(aqs
+(all 1\(aqs). If this option is specified as
+.Fl P00 ,
+it will fill in the blank areas of the hex output file with zeros (0\(aqs).
+.It Fl Q
+As the linker reads files and modules, it displays the name of each module.
+Each subsequent module name overwrites the preceding name. This option
+tells the linker not to display module names.
+.\"
+.\" -S
+.\"
+.It Fl S
+This option controls the generation of symbol file information. By default,
+no symbol file is generated. When this option is specified, a symbol file
+is generated which can be used to aid in debugging the application.
+.Pp
+The following table shows the options and the formats generated.
+.Pp
+.Bl -column "Option" "Format"
+.It Sy "Option" Ta Sy "Format"
+.It Fl S2       Ta 2500AD symbol format
+.It Fl SM       Ta MicroTek symbol format
+.It Fl SN       Ta Extended MicroTek symbol format
+.It Fl SQ       Ta Quick link object file
+.It Fl SZ       Ta WDC symbol format
+.El
+.Pp
+The linker supports an extension to the Extended MicroTek symbol file format.
+.Pp
+The linker generates the following additional symbol records if the
+.Fl G
+(source level info) option and
+.Fl SN
+options have been selected.
+.Pp
+.Bl -tag -width indent -compact
+.It 0-9
+Standard MicroTek symbol type - global symbols
+.It 50-59
+Standard MicroTek symbol type - local symbols
+.It 101
+Single character name that is the status Register as specified by
+LONGA/LONGI
+directives. In other words, if
+LONGA ON
+is specified a 101 record will be generated with a 
+$20 as the ps value.
+.It 102
+A two character name (low,high) that is the line number associated
+with this address.
+.It 103
+The name is the source file name associated with the object module.
+.It 120+N
+A zero length name with the address being the starting address for
+section N. Section 1 is CODE, section 2 is DATA, section 3 is UDATA.
+Other sections can probably be ignored unless you want to handle them.
+.It 150+N
+A zero length name with the address being the ending address for section N.
+.El
+.\"
+.\" -T
+.\"
+.It Fl T
+This option instructs the linker to generate a text map file with the
+extension
+.Pa .MAP .
+The final address of each symbol is listed.
+.It Fl U
+This option is used to specify the relocation address and the ROM address
+of the predefined UDATA section. The format is:
+.Pp
+.Dl Fl U Ns Op Ad XXXX Ns Op , Ns Ad XXXX
+.Pp
+which is similar to the 
+.Fl A
+option without the section name. The UDATA section is a little different
+since it never needs to be in the ROM at all since it contains
+uninitialized data.
+.Fl V
+This option displays additional information to the screen giving the names
+of variables and their locations.
+.It Fl W
+This option disables warnings from the linker. The linker will warn if a
+symbol defined in a program module overrides a symbol defined in a library
+module. This warning is useful for preventing hard to track down errors
+such as when the user defines a routine called write that overrides the
+library write routine.
+.Pp
+.Em Note:
+This option not used after V3.10
+.It Fl X
+This option directs the linker to use EMM memory mapping to provide
+additional space for linking programs with large numbers of symbols. It
+must be the first option specified.
+.\" -Z
+.It Fl Z
+This option is used to specify the top and bottom address to use when
+spreading the indicated section of various modules across multiple
+banks of memory. The format is:
+.Pp
+.Dl Fl Z Ns Ar section Ns = Ns Op Cm bottom Ns Op , Ns Cm top
+.Pp
+The section specified by
+.Ar section
+will be marked for spreading. The default bottom is
+.Ad 0000
+and the default top is
+.Ad $1:0000 .
+If no bottom or top is specified, the default is used. The first byte of
+the section is specified using the ROM and relative org directives.
+.Pp
+The sub-options for
+.Fl Z
+are:
+.Fl Z Ns Ar section Ns = ,
+.Fl Z Ns Ar code Ns = ,
+and
+.Fl Z Ns Ar data Ns = .
+.El
+.Sh SEE ALSO
+.Xr wdc02as 1 ,
+.Xr wdc02cc 1 ,
+.Xr wdc02op 1 ,
+.Xr wdc816as 1 ,
+.Xr wdc816cc 1 ,
+.Xr wdc816op 1 ,
+.Xr wdcdb 1 ,
+.\" .Xr wdcln 1 ,
+.Xr wdclib 1 ,
+.Xr wdcobj 1 ,
+.Xr wdcsym 1
