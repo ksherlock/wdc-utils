@@ -89,13 +89,13 @@ For example, if one of the following lines is in the
 file:
 .Pp
 .Bd -literal -offset indent
-SET WDC_INC_65816=C:\\WDC\\INCLUDE;C:\\WDC\MACROS
-SET WDC_INC_6502=C:\\WDC\\INCLUDE;C:\\WDC\MACROS
+SET WDC_INC_65816=C:\eWDC\eINCLUDE;C:\eWDC\eMACROS
+SET WDC_INC_6502=C:\eWDC\eINCLUDE;C:\eWDC\eMACROS
 .Ed
 .Pp
 then, the command:
 .Pp
-.Dl Nm Fl I Ar C:\\MYINC Ar PROG
+.Dl Nm Fl I Ar C:\eMYINC Ar PROG
 .Pp
 will assemble the file
 .Ar PROG.ASM .
@@ -107,14 +107,14 @@ directives, then the assembler will look for the specified file in this order:
 .Pp
 .Bd -literal -offset indent
 current directory
-C:\\MYINC
-C:\\WDC\\INCLUDE
-C:\\WDC\\MACROS
+C:\eMYINC
+C:\eWDC\eINCLUDE
+C:\eWDC\eMACROS
 .Ed
 .It Fl K
 This option causes the path name specifying the name of the listing file to
 be placed in the reserved word
-.Li __FILE__ .
+.Dv __FILE__ .
 .It Fl L
 This option instructs the assembler to generate a listing file that will
 have the same root name as the output name and an extension of 
