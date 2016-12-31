@@ -515,6 +515,26 @@ bool dump_obj(const char *name, int fd)
 								printf("\t.endfunc\t%d, %d, %d\n", line, local_offset, arg_offset);
 								break;
 							}
+
+							// etag? reserved for enums but not actually used?
+							case D_C_STAG:
+							case D_C_ETAG:
+							case D_C_UTAG: {
+								const char *kOpNames[] = { ".stag", ".etag", ".utag" };
+								const char *opname = kOpNames[op - D_C_STAG];
+
+								std::string name = read_cstring(iter);
+								uint16_t size = read_16(iter);
+								uint16_t tag = read_16(iter);
+								printf("\t.%s\t%s, %d, %d\n", opname, name.c_str(), size, tag);
+								break;
+							}
+							case D_C_EOS: {
+								printf("\t.eos\n");
+								break; 
+							}
+
+							case D_C_MEMBER:
 							case D_C_SYM: {
 								// warning - i don't fully understand this one..
 								std::string name = read_cstring(iter);
@@ -526,18 +546,23 @@ bool dump_obj(const char *name, int fd)
 								uint32_t type = read_32(iter);
 								uint8_t klass = read_8(iter);
 								uint16_t size = read_16(iter);
+								uint16_t tag = 0;
+								if (type == T_STRUCT) tag = read_16(iter);
+								// tag, if it's a struct...
 
 
+								const char *opname = ".sym";
+								if (op == D_C_MEMBER) opname = ".member";
 								if (version == 0) {
 									std::string svalue;
 									svalue = symbols[value].name;
-									printf("\t.sym\t%s, %s, %d, %d, %d\n",
-										name.c_str(), svalue.c_str(), type, klass, size);
+									printf("\t%s\t%s, %s, %d, %d, %d\n",
+										opname, name.c_str(), svalue.c_str(), type, klass, size);
 								}
 
 								if (version == 1) 
-									printf("\t.sym\t%s, %d, %d, %d, %d\n",
-										name.c_str(), value, type, klass, size);
+									printf("\t%s\t%s, %d, %d, %d, %d\n",
+										opname, name.c_str(), value, type, klass, size);
 
 								break;
 							}
