@@ -546,9 +546,6 @@ bool dump_obj(const char *name, int fd)
 								uint32_t type = read_32(iter);
 								uint8_t klass = read_8(iter);
 								uint16_t size = read_16(iter);
-								uint16_t tag = 0;
-								if (type == T_STRUCT) tag = read_16(iter);
-								// tag, if it's a struct...
 
 
 								const char *opname = ".sym";
@@ -556,14 +553,38 @@ bool dump_obj(const char *name, int fd)
 								if (version == 0) {
 									std::string svalue;
 									svalue = symbols[value].name;
-									printf("\t%s\t%s, %s, %d, %d, %d\n",
+									printf("\t%s\t%s, %s, %d, %d, %d",
 										opname, name.c_str(), svalue.c_str(), type, klass, size);
 								}
 
 								if (version == 1) 
-									printf("\t%s\t%s, %d, %d, %d, %d\n",
+									printf("\t%s\t%s, %d, %d, %d, %d",
 										opname, name.c_str(), value, type, klass, size);
 
+								// it's a little more complicated than this, I believe...
+								/*
+								 * type bits 1 ... 5 are T_xxxx
+								 * then 3 bits of DT_xxx (repeatedly)
+								 *
+								 * eg, char ** = DT_PTR <<11 + DT_PTR << 8 + T_CHAR
+								 */
+								int t = type & 0x1f;
+								if ((t == T_STRUCT) || (t == T_UNION)) {
+									uint16_t tag = read_16(iter);
+									printf(", %d", tag);
+								}
+
+								// need to do it until t == 0 for
+								// multidimensional arrays.
+								for ( t = type >> 5; t; t >>= 3) {
+									if ((t & 0x07) == DT_ARY) {
+										uint16_t dim = read_16(iter);
+										printf(", %d", dim);
+									}
+								}
+
+
+								printf("\n");
 								break;
 							}
 
