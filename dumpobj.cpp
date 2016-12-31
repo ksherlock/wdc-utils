@@ -460,7 +460,6 @@ bool dump_obj(const char *name, int fd)
 
 					d.flush();
 					uint16_t size = read_16(iter);
-					//printf("\t;DEBUG\n");
 
 					auto end = iter + size;
 					while (iter < end) {
@@ -566,7 +565,7 @@ bool dump_obj(const char *name, int fd)
 								 * type bits 1 ... 5 are T_xxxx
 								 * then 3 bits of DT_xxx (repeatedly)
 								 *
-								 * eg, char ** = DT_PTR <<11 + DT_PTR << 8 + T_CHAR
+								 * eg, char ** = (DT_PTR << 11) + (DT_PTR << 8) + T_CHAR
 								 */
 								int t = type & 0x1f;
 								if ((t == T_STRUCT) || (t == T_UNION)) {
