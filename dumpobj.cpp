@@ -498,16 +498,49 @@ bool dump_obj(const char *name, int fd)
 								printf("\t.block\t%d\n", block);
 								break;
 							}
+							case D_C_ENDBLOCK: {
+								uint16_t line = read_16(iter);
+								printf("\t.endblock\t%d\n", line);
+								break;
+							}
 							case D_C_FUNC: {
 								uint16_t arg = read_16(iter);
 								printf("\t.function\t%d\n", arg);
 								break;								
 							}
-							/*
-							case D_C_SYM: {
+							case D_C_ENDFUNC: {
+								uint16_t line = read_16(iter);
+								uint16_t local_offset = read_16(iter);
+								uint16_t arg_offset = read_16(iter);
+								printf("\t.endfunc\t%d, %d, %d\n", line, local_offset, arg_offset);
 								break;
 							}
-							*/
+							case D_C_SYM: {
+								// warning - i don't fully understand this one..
+								std::string name = read_cstring(iter);
+								uint8_t version = read_8(iter); //???
+								uint32_t value;
+								if (version == 0) value = read_16(iter); // symbol
+								if (version == 1) value = read_32(iter); // numeric value.
+								assert(version == 0 || version == 1);
+								uint32_t type = read_32(iter);
+								uint8_t klass = read_8(iter);
+								uint16_t size = read_16(iter);
+
+
+								if (version == 0) {
+									std::string svalue;
+									svalue = symbols[value].name;
+									printf("\t.sym\t%s, %s, %d, %d, %d\n",
+										name.c_str(), svalue.c_str(), type, klass, size);
+								}
+
+								if (version == 1) 
+									printf("\t.sym\t%s, %d, %d, %d, %d\n",
+										name.c_str(), value, type, klass, size);
+
+								break;
+							}
 
 							default:
 								errx(EX_DATAERR, "%s: unknown debug opcode %02x (%d)", name, op, op);
