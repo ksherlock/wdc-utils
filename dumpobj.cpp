@@ -19,6 +19,12 @@
 #define O_BINARY 0
 #endif
 
+
+/* not documented */
+#ifndef SEC_DATA
+#define SEC_DATA 0x80
+#endif
+
 enum class endian {
 	little = __ORDER_LITTLE_ENDIAN__,
 	big = __ORDER_BIG_ENDIAN__,
@@ -605,7 +611,7 @@ bool dump_obj(const char *name, int fd)
 					section = sec;
 					d.set_pc(sections[section].pc);
 					labels = labels_for_section(symbols, section);
-					d.set_code(section == 1 || section > 4);
+					d.set_code((sections[sec].flags & SEC_DATA) == 0);
 				}
 				break;
 			}
@@ -671,6 +677,7 @@ bool dump_obj(const char *name, int fd)
 			_(SEC_CONST);
 			_(SEC_DIRECT);
 			_(SEC_NONAME);
+			_(SEC_DATA);
 			fputs("\n", stdout);
 
 		}

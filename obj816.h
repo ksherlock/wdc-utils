@@ -126,6 +126,7 @@ enum { C_NULL, C_AUTO, C_EXT, C_STAT, C_REG, C_EXTDEF, C_ARG,
 #define SEC_CONST		0x0010
 #define SEC_DIRECT		0x0020
 #define SEC_NONAME		0x0040
+#define SEC_DATA		0x0080
 
 			/* pre-defined sections */
 enum {SECT_PAGE0, SECT_CODE, SECT_KDATA, SECT_DATA, SECT_UDATA };
