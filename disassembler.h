@@ -3,6 +3,7 @@
 
 #include <stdint.h>
 #include <string>
+#include <functional>
 
 class disassembler {
 	
@@ -41,6 +42,17 @@ class disassembler {
 		void flush();
 
 
+		void set_label_callback(std::function<int32_t(int32_t)> callback) {
+			_label_callback = callback;
+			_next_label = -1;
+			if (_label_callback) _next_label = _label_callback(-1);
+		}
+
+		void recalc_next_label() {
+			if (_label_callback) _next_label = _label_callback(-1);
+			else _next_label = -1;
+		}
+
 
 	private:
 
@@ -55,7 +67,11 @@ class disassembler {
 		void print_prefix();
 		void print_suffix();
 
+		std::string prefix();
+		std::string suffix();
+
 		void hexdump();
+		void hexdump(std::string &);
 
 		unsigned _st = 0;
 		uint8_t _op = 0;
@@ -67,6 +83,11 @@ class disassembler {
 		unsigned _arg = 0;
 
 		bool _code = true;
+		int32_t _next_label = -1;
+
+		void check_labels();
+
+		std::function<int32_t(int32_t)> _label_callback;
 };
 
 #endif

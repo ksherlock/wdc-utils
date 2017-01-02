@@ -333,42 +333,92 @@ static constexpr const int modes[] =
 };
 
 
+static std::string to_x(uint32_t x, unsigned bytes, char prefix = 0) {
+	std::string s;
+	char buffer[16];
+	if (prefix) s.push_back(prefix);
+
+	memset(buffer, '0', sizeof(buffer));
+	int i = 16;
+	while (x) {
+		buffer[--i] = "0123456789abcdef"[x & 0x0f];
+		x >>= 4;
+	}
+
+	s.append(buffer + 16 - bytes, buffer + 16);
+
+	return s;
+}
+
+
+
 void disassembler::reset() {
 	_arg = 0;
 	_st = 0;
 }
+
+constexpr const int kOpcodeTab = 20;
+constexpr const int kOperandTab = 30;
+constexpr const int kCommentTab = 80;
+
+void indent_to(std::string &line, unsigned position) {
+	if (line.length() < position)
+		line.resize(position, ' ');
+}
+
+
 void disassembler::dump() {
+
+	std::string line;
 
 	if (!_st) return;
 
-	hexdump();
 
-	printf("\tbyte\t");
+	indent_to(line, kOpcodeTab);
+	line += "db";
+	indent_to(line, kOperandTab);
+
 
 	for (unsigned i = 0; i < _st; ++i) {
-		if (i > 0) printf(", ");
-		printf("$%02x", _bytes[i]);
+		if (i > 0) line += ", ";
+		line += to_x(_bytes[i], 2, '$');
 	}
-	printf("\n");
+
+	hexdump(line);
+	line.push_back('\n');
+	fputs(line.c_str(), stdout);
+
 	_pc += _st;
 	reset();
 }
 
 void disassembler::dump(const std::string &expr, unsigned size) {
+
+	std::string line;
+
 	if (_st) dump();
 
 	for (_st = 0; _st < size; ++_st) _bytes[_st] = 0;
 
-	hexdump();
+	indent_to(line, kOpcodeTab);
 
 	switch(size) {
-		case 1: printf("\tbyte\t"); break;
-		case 2: printf("\tword\t"); break;
-		case 3: printf("\tda\t"); break;
-		case 4: printf("\tlong\t"); break;
-		default: printf("\t%d bytes\t", size);
+		case 1: line += "db"; break;
+		case 2: line += "dw"; break;
+		case 3: line += "da"; break;
+		case 4: line += "dl"; break;
+		default:
+			line += std::to_string(size);
+			line += " bytes";
+			break;
 	}
-	printf("%s\n", expr.c_str());
+	indent_to(line, kOperandTab);
+	line += expr;
+
+	hexdump(line);
+	line.push_back('\n');
+	fputs(line.c_str(), stdout);
+
 	_pc += _st;
 	reset();
 }
@@ -378,7 +428,19 @@ void disassembler::flush() {
 }
 
 
+void disassembler::check_labels() {
+
+	if ( _label_callback && _next_label >= 0 && _pc + _st >= _next_label) {
+		flush();
+		_next_label = _label_callback(_pc);
+	}
+
+}
+
 void disassembler::operator()(const std::string &expr, unsigned size) {
+
+	// todo -- what if label within size?
+	check_labels();
 
 	if (!_code) {
 		dump(expr, size);
@@ -396,6 +458,8 @@ void disassembler::operator()(const std::string &expr, unsigned size) {
 
 
 void disassembler::operator()(uint8_t byte) {
+
+	check_labels();
 
 	if (!_code) {
 		_bytes[_st++] = byte;
@@ -455,6 +519,68 @@ void disassembler::print_prefix() {
 	}
 }
 
+
+std::string disassembler::prefix() {
+
+	std::string tmp;
+
+	switch(_mode & 0xf000) {
+		case mImmediate: tmp = "#"; break;
+		case mDP: tmp = "<"; break;
+		case mDPI: tmp = "(<"; break;
+		case mDPIL: tmp = "[<"; break;
+
+		case mRelative:
+		case mBlockMove:
+			break;
+
+		// cop, brk are treated as absolute.
+		case mAbsolute: 
+			//if (_size == 1) printf("\t");
+			if (_size > 1) tmp = "|";
+			break;
+		case mAbsoluteLong: tmp = ">"; break;
+		case mAbsoluteI: tmp = "("; break;
+	}
+	return tmp;
+}
+
+
+
+std::string disassembler::suffix() {
+
+	std::string tmp;
+
+	switch(_mode & 0x0f00) {
+		case m_X: tmp = ",x"; break;
+		case m_Y: if (!(_mode & (mDPI|mDPIL))) tmp = ",y"; break;
+		case m_S:
+		case m_S | m_Y:
+			tmp = ",s"; break;
+	}
+
+	switch(_mode & 0xf000) {
+		case mAbsoluteI:
+		case mDPI:
+			tmp += ")"; break;
+		case mAbsoluteIL:
+		case mDPIL:
+			tmp += "]"; break;
+	}
+
+	// (xxx,s),y
+	// (xxx),y
+	// [xxx],y
+	switch(_mode & 0x0f00) {
+		case m_Y:
+			if (_mode & (mDPI|mDPIL)) tmp += ",y"; break;
+		case m_S | m_Y:
+			tmp += ",y"; break;
+	}	
+	return tmp;
+
+}
+
 void disassembler::print_suffix() {
 
 	switch(_mode & 0x0f00) {
@@ -485,6 +611,34 @@ void disassembler::print_suffix() {
 
 }
 
+
+void disassembler::hexdump(std::string &line) {
+	// print pc and hexdump...
+
+	indent_to(line, kCommentTab);
+	line += "; ";
+
+	line += to_x(_pc, 4);
+	line.push_back(':');
+
+	int i;
+	for (i = 0; i < _st; ++i) {
+		line.push_back(' ');
+		line += to_x(_bytes[i], 2);
+	}
+	for ( ; i < 4; ++i) {
+		line += "   ";
+	}
+	line += "  ";
+	for (i = 0; i < _st; ++i) {
+		uint8_t c = _bytes[i];
+		if (isprint(c) && isascii(c)) line += c;
+		else line += '.';
+	}
+}
+
+
+
 void disassembler::hexdump() {
 	// print pc and hexdump...
 	int i;
@@ -494,46 +648,86 @@ void disassembler::hexdump() {
 	}
 	for ( ; i < 4; ++i) {
 		printf("   ");
-	}	
+	}
+	printf("  ");
+	for (i = 0; i < _st; ++i) {
+		uint8_t c = _bytes[i];
+		if (isprint(c) && isascii(c)) putc(c, stdout);
+		else putc('.', stdout); 
+	}
+	for ( ; i < 4; ++i) {
+		printf(" ");
+	}
 }
 
 void disassembler::print() {
 
-	hexdump();
 
-	printf("\t%.3s", &opcodes[_op * 3]);
+	if (_size) {
+		std::string tmp;
 
-	print_prefix();
+		switch(_mode & 0xf000) {
+			case mRelative: {
 
-	// todo -- relative, block mode.
-	switch (_size) {
-		case 0: break;
-		case 1: printf("$%02x", _arg); break;
-		case 2: printf("$%04x", _arg); break;
-		case 3: printf("$%06x", _arg); break;
+				uint32_t pc = _pc + 1 + _size + _arg;
+
+				if ((_size == 1) && (_arg & 0x80))
+					pc += 0xff00;
+				pc &= 0xffff;
+				tmp = to_x(pc, 4, '$');
+				// it would be really fancy if it checked for a label name @pc...
+				break;
+			}
+			case mBlockMove: {
+				// todo -- verify order.
+				tmp = to_x((_arg >> 0) & 0xff, 2, '$')
+					+ ","
+					+ to_x((_arg >> 8) & 0xff, 2, '$');
+				break;
+			}
+			default: {
+				tmp = to_x(_arg, _size * 2, '$');
+				break;
+			}
+		}
+		print(tmp);
+		return;
+
 	}
 
-	print_suffix();
-	// also print bytes?
-	printf("\n");
+	std::string line;
+
+	indent_to(line, kOpcodeTab);
+	line.append(&opcodes[_op * 3], 3);
+
+
+	hexdump(line);
+	line.push_back('\n');
+	fputs(line.c_str(), stdout);
 	_pc += _size + 1;
 	reset();
 }
 
 void disassembler::print(const std::string &expr) {
 
-	hexdump();
 
-	printf("\t%.3s", &opcodes[_op * 3]);
+	std::string line;
 
-	print_prefix();
+	indent_to(line, kOpcodeTab);
+	line.append(&opcodes[_op * 3], 3);
 
-	// todo -- relative, block mode.
-	printf("%s", expr.c_str());
+	if (_size) {
 
-	print_suffix();
-	// also print bytes?
-	printf("\n");
+		indent_to(line, kOperandTab);
+		line += prefix();
+		line += expr;
+		line += suffix();
+	}
+
+	hexdump(line);
+	line.push_back('\n');
+	fputs(line.c_str(), stdout);
+
 	_pc += _size + 1;
 	reset();	
 }

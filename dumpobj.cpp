@@ -156,7 +156,10 @@ struct section {
 	uint8_t flags = 0;
 	uint32_t size = 0;
 	uint32_t org = 0;
+
+	// for disassembly tracking...
 	uint32_t pc = 0;
+	std::vector<symbol> symbols;
 };
 
 std::vector<section> read_sections(const std::vector<uint8_t> &section_data) {
@@ -237,6 +240,72 @@ void place_labels(std::vector<symbol> &labels, uint32_t pc) {
 	}
 }
 
+void emit(const std::string &label) {
+	fputs(label.c_str(), stdout);
+	//fputc(':', stdout); // special case.
+	fputc('\n', stdout);
+}
+
+void emit(const std::string &label, const std::string &opcode) {
+	fputs(label.c_str(), stdout);
+
+	int column = label.length();
+
+	if (!opcode.empty()) {
+		do {
+			putc(' ', stdout);
+			column++;
+		} while (column < 20);
+		fputs(opcode.c_str(), stdout);
+	}
+	fputc('\n', stdout);
+}
+
+
+
+void emit(const std::string &label, const std::string &opcode, const std::string &operand) {
+	fputs(label.c_str(), stdout);
+	int column = label.length();
+
+	if (!opcode.empty()) {
+
+		do {
+			putc(' ', stdout);
+			column++;
+		} while (column < 20);
+		fputs(opcode.c_str(), stdout);
+		column += opcode.length();
+	}
+
+	if (!operand.empty()) {
+		do {
+			putc(' ', stdout);
+			column++;
+		} while (column < 30);
+		fputs(operand.c_str(), stdout);
+		column += operand.length();
+	}
+	fputc('\n', stdout);
+	return;
+}
+
+static std::string to_x(uint32_t x, unsigned bytes, char prefix = 0) {
+	std::string s;
+	char buffer[16];
+	if (prefix) s.push_back(prefix);
+
+	memset(buffer, '0', sizeof(buffer));
+	int i = 16;
+	while (x) {
+		buffer[--i] = "0123456789abcdef"[x & 0x0f];
+		x >>= 4;
+	}
+
+	s.append(buffer + 16 - bytes, buffer + 16);
+
+	return s;
+}
+
 bool dump_obj(const char *name, int fd)
 {
 	static const char *kSections[] = { "PAGE0", "CODE", "KDATA", "DATA", "UDATA" };
@@ -275,6 +344,7 @@ bool dump_obj(const char *name, int fd)
 	if (ok != h.h_namlen) errx(EX_DATAERR, "%s", name);
 
 
+	/*
 	printf("name: %s\n", oname.data());
 	printf("record size    : $%04x\n", h.h_recsize);
 	printf("section size   : $%04x\n", h.h_secsize);
@@ -282,6 +352,7 @@ bool dump_obj(const char *name, int fd)
 	printf("option size    : $%04x\n", h.h_optsize);
 	printf("number sections: $%04x\n", h.h_num_secs);
 	printf("number symbols : $%04x\n", h.h_num_syms);
+	*/
 
 	// records [until record_eof]
 
@@ -316,15 +387,90 @@ bool dump_obj(const char *name, int fd)
 	for (int i = 0; i < 5; ++i) 
 		if (sections[i].name.empty()) sections[i].name = kSections[i];
 
+
+	/* custom sections... */
+	if (sections.size() >= 5) {
+
+		printf("\n");
+		for (auto iter = sections.begin() + 5; iter != sections.end(); ++iter) {
+			std::string attr;
+
+			bool comma = false;
+			int flags = iter->flags;
+			if (flags & SEC_OFFSET) {
+				if (comma) attr += ", ";
+				attr += "SEC_OFFSET $";
+				attr += to_x(iter->org, 4);
+				comma = true;
+			}
+			if (flags & SEC_INDIRECT) {
+				if (comma) attr += ", ";
+				attr += "SEC_INDIRECT $";
+				attr += to_x(iter->org, 4);
+				comma = true;
+			}
+#define _(x) if (flags & x) { if (comma) attr += ", "; attr += #x; comma = true; }
+			_(SEC_STACKED)
+			_(SEC_REF_ONLY)
+			_(SEC_CONST)
+			_(SEC_DIRECT)
+			_(SEC_NONAME)
+			_(SEC_DATA)
+#undef _
+
+			emit(iter->name, "section", attr);
+		}
+		printf("\n");
+	}
+
+
+	emit("", "MODULE", std::string(oname.data()));
+	emit("", "CODE", "; section 1");
 	d.set_pc(0);
 	d.set_code(true);
 
-	std::vector<symbol> labels = labels_for_section(symbols, section);
+
+	for (auto &s : symbols) {
+		if (s.type == S_UND) continue;
+		sections[s.section].symbols.push_back(s);
+	}
+	for (auto &section : sections) {
+		std::sort(section.symbols.begin(), section.symbols.end(), [](const symbol &a, const symbol &b){
+			return a.offset > b.offset;
+		});
+	}
+
+	d.set_label_callback([&section, &sections](int32_t offset) -> int32_t {
+		auto &symbols = sections[section].symbols;
+
+		if (offset >= 0) {
+
+			while(!symbols.empty()) {
+				auto &s = symbols.back();
+				if (s.offset > offset) return s.offset;
+				if (s.offset == offset) {
+					emit(s.name);
+				} else {
+					std::string tmp = "; ";
+					tmp += s.name;
+					tmp += " = $";
+					tmp += to_x(s.offset, 4);
+					emit("", tmp);
+				}
+				symbols.pop_back();
+				continue;
+			}
+		}
+		if (symbols.empty()) return -1;
+		return symbols.back().offset;
+	});
+
+	//std::vector<symbol> labels = labels_for_section(symbols, section);
 
 	auto iter = data.begin();
 	while (iter != data.end()) {
 
-		place_labels(labels, d.pc());
+		//place_labels(labels, d.pc());
 
 		op = read_8(iter);
 		if (op == 0) break;
@@ -332,7 +478,7 @@ bool dump_obj(const char *name, int fd)
 			auto end = iter + op;
 			while (iter != end) {
 				d(*iter++);
-				place_labels(labels, d.pc());
+				//place_labels(labels, d.pc());
 			}
 			continue;
 		}
@@ -473,51 +619,56 @@ bool dump_obj(const char *name, int fd)
 						switch(op) {
 							case D_LONGA_ON:
 								d.set_m(true);
-								printf("\tlonga\ton\n");
+								emit("", "longa", "on");
 								break;
 							case D_LONGA_OFF:
 								d.set_m(false);
-								printf("\tlonga\toff\n");
+								emit("", "longa", "off");
 								break;
 							case D_LONGI_ON:
 								d.set_x(true);
-								printf("\tlongi\ton\n");
+								emit("", "longi", "on");
 								break;
 							case D_LONGI_OFF:
 								d.set_x(false);
-								printf("\tlongi\toff\n");
+								emit("", "longi", "off");
 								break;
 							case D_C_FILE: {
 								file = read_cstring(iter);
 								line = read_16(iter);
-								printf("\t.file\t\"%s\", %d\n", file.c_str(), line);
+								std::string tmp = file + ", " + std::to_string(line);
+								emit("", ".file", tmp);
 								break;
 							}
 							case D_C_LINE: {
 								line = read_16(iter);
-								printf("\t.line\t%d\n", line);
+								emit("",".line", std::to_string(line));
 								break;
 							}
 							case D_C_BLOCK: {
 								uint16_t block = read_16(iter);
-								printf("\t.block\t%d\n", block);
+								emit("",".block", std::to_string(line));
 								break;
 							}
 							case D_C_ENDBLOCK: {
 								uint16_t line = read_16(iter);
-								printf("\t.endblock\t%d\n", line);
+								emit("",".endblock", std::to_string(line));
 								break;
 							}
 							case D_C_FUNC: {
 								uint16_t arg = read_16(iter);
-								printf("\t.function\t%d\n", arg);
+								emit("",".function", std::to_string(line));
 								break;								
 							}
 							case D_C_ENDFUNC: {
 								uint16_t line = read_16(iter);
 								uint16_t local_offset = read_16(iter);
 								uint16_t arg_offset = read_16(iter);
-								printf("\t.endfunc\t%d, %d, %d\n", line, local_offset, arg_offset);
+								std::string tmp;
+								tmp = std::to_string(line) + ", "
+									+ std::to_string(local_offset) + ", "
+									+ std::to_string(arg_offset);
+								emit("",".endfunc", tmp);
 								break;
 							}
 
@@ -531,11 +682,14 @@ bool dump_obj(const char *name, int fd)
 								std::string name = read_cstring(iter);
 								uint16_t size = read_16(iter);
 								uint16_t tag = read_16(iter);
-								printf("\t.%s\t%s, %d, %d\n", opname, name.c_str(), size, tag);
+
+								std::string tmp;
+								tmp = name + ", " + std::to_string(size) + ", " + std::to_string(tag);
+								emit("", opname, tmp);
 								break;
 							}
 							case D_C_EOS: {
-								printf("\t.eos\n");
+								emit("", ".eos");
 								break; 
 							}
 
@@ -555,18 +709,26 @@ bool dump_obj(const char *name, int fd)
 
 								const char *opname = ".sym";
 								if (op == D_C_MEMBER) opname = ".member";
+
+
+								std::string attr;
+
 								if (version == 0) {
 									std::string svalue;
 									svalue = symbols[value].name;
-									printf("\t%s\t%s, %s, %d, %d, %d",
-										opname, name.c_str(), svalue.c_str(), type, klass, size);
+
+									attr = name + ", " + svalue;
 								}
 
-								if (version == 1) 
-									printf("\t%s\t%s, %d, %d, %d, %d",
-										opname, name.c_str(), value, type, klass, size);
+								if (version == 1) {
+									attr = name + ", " + std::to_string(value);
+								}
 
-								// it's a little more complicated than this, I believe...
+								attr += ", " + std::to_string(type);
+								attr += ", " + std::to_string(klass);
+								attr += ", " + std::to_string(size);
+
+
 								/*
 								 * type bits 1 ... 5 are T_xxxx
 								 * then 3 bits of DT_xxx (repeatedly)
@@ -576,7 +738,7 @@ bool dump_obj(const char *name, int fd)
 								int t = type & 0x1f;
 								if ((t == T_STRUCT) || (t == T_UNION)) {
 									uint16_t tag = read_16(iter);
-									printf(", %d", tag);
+									attr += ", " + std::to_string(tag);
 								}
 
 								// need to do it until t == 0 for
@@ -584,12 +746,13 @@ bool dump_obj(const char *name, int fd)
 								for ( t = type >> 5; t; t >>= 3) {
 									if ((t & 0x07) == DT_ARY) {
 										uint16_t dim = read_16(iter);
-										printf(", %d", dim);
+										attr += ", " + std::to_string(dim);
 									}
 								}
 
 
-								printf("\n");
+								emit("", opname, attr);
+
 								break;
 							}
 
@@ -605,13 +768,23 @@ bool dump_obj(const char *name, int fd)
 			case REC_SECT: {
 				d.flush();
 				uint8_t sec = read_8(iter);
-				printf("\t.sect\t%d\n", sec);
+				//printf("\t.sect\t%d\n", sec);
 				if (sec != section) {
+
+					if (sec >= sections.size()) {
+						warnx("Undefined section %d", sec);
+					}
+
+					const auto &s = sections[sec];
+					emit("", "ends", std::string("; end section ") + std::to_string(section));
+					printf("\n");
+					emit("", s.name, std::string("; section ") + std::to_string(sec));
+
 					sections[section].pc = d.pc();
 					section = sec;
-					d.set_pc(sections[section].pc);
-					labels = labels_for_section(symbols, section);
-					d.set_code((sections[sec].flags & SEC_DATA) == 0);
+					d.set_pc(s.pc);
+					d.recalc_next_label();
+					d.set_code((s.flags & SEC_DATA) == 0);
 				}
 				break;
 			}
@@ -619,7 +792,7 @@ bool dump_obj(const char *name, int fd)
 			case REC_ORG: {
 				d.flush();
 				uint32_t org = read_32(iter);
-				printf("\t.org\t$%04x\n", org);
+				emit("", ".org", to_x(org, 4, '$'));
 				d.set_pc(org);
 				break;
 			}
@@ -627,7 +800,8 @@ bool dump_obj(const char *name, int fd)
 			case REC_SPACE: {
 				d.flush();
 				uint16_t count = read_16(iter);
-				printf("\tds\t$%04x\n", count);
+				// todo -- need to coordinate with label printer/disassembler.
+				emit("", "ds", to_x(count, 4, '$'));
 				d.set_pc(d.pc() + count);
 				break;
 			}
@@ -643,80 +817,23 @@ bool dump_obj(const char *name, int fd)
 				errx(EX_DATAERR, "%s: unknown opcode %02x", name, op);
 		}
 	}
+	// dump any unfinished business.
+	d.flush();
 
-	place_labels(labels, d.pc());
-
-
+	//place_labels(labels, d.pc());
+	/*
 	for(auto &label : labels) {
 		warnx("Unable to place label %s (offset $%04x)", label.name.c_str(), label.offset);
 	}
-
-
+	*/
+	emit("", "ends");
+	printf("\n");
+	emit("", "endmod");
+	printf("\n");
 
 	if (iter != data.end() || op != REC_END) errx(EX_DATAERR, "%s records ended early", name);
 
 
-	// section info
-
-	printf("\nSections\n");
-
-	for(const auto &s : sections) {
-		if (s.size) {
-
-			printf("section %d\n", s.number);
-			if (!(s.flags & SEC_NONAME))
-				printf("name: %s\n", s.name.c_str());
-			printf("flags: %02x ", s.flags);
-
-	#undef _
-	#define _(x) if (s.flags & x) fputs(#x " ", stdout)
-			_(SEC_OFFSET);
-			_(SEC_INDIRECT);
-			_(SEC_STACKED);
-			_(SEC_REF_ONLY);
-			_(SEC_CONST);
-			_(SEC_DIRECT);
-			_(SEC_NONAME);
-			_(SEC_DATA);
-			fputs("\n", stdout);
-
-		}
-	}
-
-
-	// symbol info
-#if 0
-	printf("\nSymbols\n");
-
-	iter = symbol_data.begin();
-	while (iter != symbol_data.end()) {
-		uint8_t type = read_8(iter);
-		uint8_t flags = read_8(iter);
-		uint8_t section = read_8(iter);
-		uint32_t offset = type == S_UND ? 0 : read_32(iter);
-		std::string name = read_cstring(iter);
-
-		printf("name : %s\n", name.c_str());
-		printf("type : $%02x %s\n", type, type < sizeof(kTypes) / sizeof(kTypes[0]) ? kTypes[type] : "");
-		printf("flags: $%02x ", flags);
-#undef _
-#define _(x) if (flags & x) fputs(#x " ", stdout)
-		_(SF_GBL);
-		_(SF_DEF);
-		_(SF_REF);
-		_(SF_VAR);
-		_(SF_PG0);
-		_(SF_TMP);
-		_(SF_DEF2);
-		_(SF_LIB);
-		fputs("\n", stdout);
-		printf("section: %02x %s\n", section,
-			section < sizeof(sections) / sizeof(sections[0]) ? sections[section] : "");
-		if (type != S_UND)
-			printf("offset: %04x\n", offset);
-
-	}
-#endif
 	return true;
 }
 
