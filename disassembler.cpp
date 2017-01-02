@@ -283,7 +283,7 @@ static constexpr const int modes[] =
 	1 | mDPI | m_Y,                 // d1 cmp (dp),y
 	1 | mDPI,                       // d2 cmp (dp)
 	1 | mDPI | m_S | m_Y,           // d3 cmp ,s,y
-	1 | mDPI,                       // d4 pei (dp)
+	1 | mDP,                        // d4 pei (dp) --> pei <dp
 	1 | mDP | m_X,                  // d5 cmp dp,x
 	1 | mDP | m_X,                  // d6 dec dp,x
 	1 | mDPIL | m_Y,                // d7 cmp [dp],y
@@ -317,7 +317,7 @@ static constexpr const int modes[] =
 	1 | mDPI | m_Y,                 // f1 sbc (dp),y
 	1 | mDPI,                       // f2 sbc (dp)
 	1 | mDPI | m_S | m_Y,           // f3 sbc ,s,y
-	2 | mAbsolute,                  // f4 pea |abs
+	2 | mImmediate,                 // f4 pea |abs --> pea #imm
 	1 | mDP | m_X,                  // f5 sbc dp,x
 	1 | mDP | m_X,                  // f6 inc dp,x
 	1 | mDPIL | m_Y,                // f7 sbc [dp],y
