@@ -1,6 +1,7 @@
 #include "disassembler.h"
 #include <stdio.h>
-
+#include <string.h>
+#include <string>
 
 static constexpr const char opcodes[] = 
 	"brkoracoporatsboraaslora"
