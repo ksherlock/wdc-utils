@@ -425,12 +425,13 @@ bool dump_obj(const char *name, int fd)
 
 
 	emit("", "MODULE", std::string(oname.data()));
-	emit("", "CODE", "; section 1");
+	printf("\n");
+
 	d.set_pc(0);
 	d.set_code(true);
 
 
-	for (auto &s : symbols) {
+	for (const auto &s : symbols) {
 		if (s.type == S_UND) continue;
 		sections[s.section].symbols.push_back(s);
 	}
@@ -438,6 +439,36 @@ bool dump_obj(const char *name, int fd)
 		std::sort(section.symbols.begin(), section.symbols.end(), [](const symbol &a, const symbol &b){
 			return a.offset > b.offset;
 		});
+	}
+
+
+	// print out any reference-only sections and symbols.
+	for (auto &section : sections) {
+		if ((section.flags & SEC_REF_ONLY) == 0) continue;
+		if (section.size == 0) continue;
+
+		emit("", section.name);
+
+		if (section.org) emit("",".org", to_x(section.org,4,'$'));
+		uint32_t pc = section.org;
+		
+		auto &symbols = section.symbols;
+		while (!symbols.empty()) {
+			auto &s = symbols.back();
+
+			if (s.offset > pc) {
+				emit("","ds", std::to_string(s.offset - pc));
+				pc = s.offset;
+			}
+			emit(s.name);
+			symbols.pop_back();
+		}
+
+		if (pc < section.size)
+			emit("","ds",std::to_string(section.size - pc));
+
+		emit("","ends");
+		printf("\n");
 	}
 
 	d.set_label_callback([&section, &sections](int32_t offset) -> int32_t {
@@ -466,6 +497,9 @@ bool dump_obj(const char *name, int fd)
 	});
 
 	//std::vector<symbol> labels = labels_for_section(symbols, section);
+
+
+	emit("", "CODE", "; section 1");
 
 	auto iter = data.begin();
 	while (iter != data.end()) {
