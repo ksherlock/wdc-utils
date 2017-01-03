@@ -389,7 +389,7 @@ bool dump_obj(const char *name, int fd)
 
 
 	/* custom sections... */
-	if (sections.size() >= 5) {
+	if (sections.size() > 5) {
 
 		printf("\n");
 		for (auto iter = sections.begin() + 5; iter != sections.end(); ++iter) {
