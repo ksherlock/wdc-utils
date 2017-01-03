@@ -431,10 +431,25 @@ bool dump_obj(const char *name, int fd)
 	d.set_code(true);
 
 
+	bool newline = false;
+
+	for (const auto &s : symbols) {
+		if (s.type != S_UND) continue;
+		emit("", "extern", s.name);
+		newline = true;
+	}
+
 	for (const auto &s : symbols) {
 		if (s.type == S_UND) continue;
 		sections[s.section].symbols.push_back(s);
+
+		if (s.flags & SF_GBL) {
+			emit("", "public", s.name);
+			newline = true;
+		}
 	}
+	if (newline) printf("\n");
+
 	for (auto &section : sections) {
 		std::sort(section.symbols.begin(), section.symbols.end(), [](const symbol &a, const symbol &b){
 			return a.offset > b.offset;
