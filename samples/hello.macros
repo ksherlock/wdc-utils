@@ -1,0 +1,24 @@
+
+_WriteLine	macro
+		ldx #$1a0c
+		jsl $e10000
+		endm
+
+cstr		macro str
+		db str
+		db 0
+		endm
+
+pstr		macro str
+		db end#-start#
+start#
+		db str
+end#
+		endm
+
+gsstr		macro str
+		dw end#-start#
+start#
+		db str
+end#
+		endm
