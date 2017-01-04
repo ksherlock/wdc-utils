@@ -911,6 +911,14 @@ bool dump_obj(const char *name, int fd)
 
 
 	if (flags._S) {
+		printf("; sections\n");
+		for (auto &s : sections) {
+			printf("; %-20s %02x %02x %04x %04x\n",
+				s.name.c_str(), s.number, s.flags, s.size, s.org);
+		}
+
+		printf(";\n");
+
 		printf("; symbols\n");
 		for (auto &s : symbols) {
 			printf("; %-20s %02x %02x %02x %08x\n",
