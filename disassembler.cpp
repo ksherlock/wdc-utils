@@ -339,6 +339,10 @@ static std::string to_x(uint32_t x, unsigned bytes, char prefix = 0) {
 	char buffer[16];
 	if (prefix) s.push_back(prefix);
 
+	if (x >= 0xff && bytes < 4) bytes = 4;
+	if (x >= 0xffff && bytes < 6) bytes = 6;
+	if (x >= 0xffffff && bytes < 8) bytes = 8;
+
 	memset(buffer, '0', sizeof(buffer));
 	int i = 16;
 	while (x) {
@@ -681,9 +685,9 @@ void disassembler::print() {
 			}
 			case mBlockMove: {
 				// todo -- verify order.
-				tmp = to_x((_arg >> 0) & 0xff, 2, '$')
+				tmp = to_x((_arg >> 8) & 0xff, 2, '$')
 					+ ","
-					+ to_x((_arg >> 8) & 0xff, 2, '$');
+					+ to_x((_arg >> 0) & 0xff, 2, '$');
 				break;
 			}
 			default: {

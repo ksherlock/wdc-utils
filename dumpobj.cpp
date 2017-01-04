@@ -26,6 +26,13 @@
 #define SEC_DATA 0x80
 #endif
 
+
+struct {
+	bool _S = false;
+	bool _g = false;
+} flags;
+
+
 enum class endian {
 	little = __ORDER_LITTLE_ENDIAN__,
 	big = __ORDER_BIG_ENDIAN__,
@@ -99,7 +106,7 @@ uint16_t read_16(T &iter) {
 }
 
 template<class T>
-uint16_t read_32(T &iter) {
+uint32_t read_32(T &iter) {
 	uint32_t tmp = 0;
 
 	tmp |= *iter << 0;
@@ -295,6 +302,10 @@ static std::string to_x(uint32_t x, unsigned bytes, char prefix = 0) {
 	char buffer[16];
 	if (prefix) s.push_back(prefix);
 
+	if (x >= 0xff && bytes < 4) bytes = 4;
+	if (x >= 0xffff && bytes < 6) bytes = 6;
+	if (x >= 0xffffff && bytes < 8) bytes = 8;
+
 	memset(buffer, '0', sizeof(buffer));
 	int i = 16;
 	while (x) {
@@ -442,6 +453,8 @@ bool dump_obj(const char *name, int fd)
 
 	for (const auto &s : symbols) {
 		if (s.type == S_UND) continue;
+		if (s.type == S_ABS) continue; // ? equ/gequ
+		// only if s.type == S_REL?
 		sections[s.section].symbols.push_back(s);
 
 		if (s.flags & SF_GBL) {
@@ -486,6 +499,19 @@ bool dump_obj(const char *name, int fd)
 		emit("","ends");
 		printf("\n");
 	}
+
+	//
+	// print equates.
+	// doesn the section matter?
+	newline = false;
+	for (const auto &s : symbols) {
+		if (s.type == (ST_EQU << 4) + S_ABS) {
+			emit(s.name,"gequ", to_x(s.offset, 4, '$'));
+			newline = true;
+		}
+	}
+	if (newline) printf("\n");
+
 
 	d.set_label_callback([&section, &sections](int32_t offset) -> int32_t {
 		auto &symbols = sections[section].symbols;
@@ -884,6 +910,15 @@ bool dump_obj(const char *name, int fd)
 	if (iter != data.end() || op != REC_END) errx(EX_DATAERR, "%s records ended early", name);
 
 
+	if (flags._S) {
+		printf("; symbols\n");
+		for (auto &s : symbols) {
+			printf("; %-20s %02x %02x %02x %08x\n",
+				s.name.c_str(), s.type, s.flags, s.section, s.offset);
+		}
+	}
+
+
 	return true;
 }
 
@@ -982,8 +1017,12 @@ void dump(const char *name) {
 int main(int argc, char **argv) {
 
 	int c;
-	while ((c = getopt(argc, argv, "")) != -1) {
-
+	while ((c = getopt(argc, argv, "Sg")) != -1) {
+			switch(c) {
+				case 'S': flags._S = true; break;
+				case 'g': flags._g = true; break;
+				default: exit(EX_USAGE); break;
+			}
 	}
 
 	argv += optind;
