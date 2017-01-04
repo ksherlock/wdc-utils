@@ -204,7 +204,7 @@
 	;
 	cpy	#$1234
 	cmp	(<$12,x)
-	rep	#$1234
+	rep	#$00
 	cmp	<$12,s
 	cpy	<$12
 	cmp	<$12
@@ -231,14 +231,16 @@
 	cmp	|$1234,y
 	phx
 	stp
-	jml	[|$1234]
+	jml	($1234) ; was jml [$1234]
+	;jmp [$1234] ; ok!
+	;jml [$1234] ; error!
 	cmp	|$1234,x
 	dec	|$1234,x
 	cmp	>$123456,x
 	;
 	cpx	#$1234
 	sbc	(<$12,x)
-	sep	#$1234
+	sep	#$00
 	sbc	<$12,s
 	cpx	<$12
 	sbc	<$12

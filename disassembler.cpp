@@ -134,7 +134,7 @@ static constexpr const int modes[] =
 	2 | mBlockMove,             // 44 mvp x,x
 	1 | mDP,                    // 45 eor dp
 	1 | mDP,                    // 46 lsr dp
-	1 | mDPIL | m_Y,            // 47 eor [dp],y
+	1 | mDPIL,                  // 47 eor [dp]
 	0 | mImplied,               // 48 pha
 	1 | mImmediate | m_M,       // 49 eor #imm
 	0 | mImplied,               // 4a lsr a
@@ -326,7 +326,7 @@ static constexpr const int modes[] =
 	2 | mAbsolute | m_Y,            // f9 sbc |abs,y
 	0 | mImplied,                   // fa plx
 	0 | mImplied,                   // fb xce
-	2 | mAbsoluteI,                 // fc jsr (abs)
+	2 | mAbsoluteI | m_X,           // fc jsr (abs,x)
 	2 | mAbsolute | m_X,            // fd sbc |abs,x
 	2 | mAbsolute | m_X,            // fe inc |abs,x
 	3 | mAbsoluteLong | m_X,        // ff sbc >abs,x      
@@ -339,9 +339,9 @@ static std::string to_x(uint32_t x, unsigned bytes, char prefix = 0) {
 	char buffer[16];
 	if (prefix) s.push_back(prefix);
 
-	if (x >= 0xff && bytes < 4) bytes = 4;
-	if (x >= 0xffff && bytes < 6) bytes = 6;
-	if (x >= 0xffffff && bytes < 8) bytes = 8;
+	if (x > 0xff && bytes < 4) bytes = 4;
+	if (x > 0xffff && bytes < 6) bytes = 6;
+	if (x > 0xffffff && bytes < 8) bytes = 8;
 
 	memset(buffer, '0', sizeof(buffer));
 	int i = 16;
@@ -509,6 +509,7 @@ void disassembler::print_prefix() {
 		case mDP: printf("\t<"); break;
 		case mDPI: printf("\t(<"); break;
 		case mDPIL: printf("\t[<"); break;
+		case mAbsoluteIL: printf("\t["); break;
 
 		case mRelative:
 		case mBlockMove:
@@ -534,6 +535,7 @@ std::string disassembler::prefix() {
 		case mDP: tmp = "<"; break;
 		case mDPI: tmp = "(<"; break;
 		case mDPIL: tmp = "[<"; break;
+		case mAbsoluteIL: tmp = "["; break;
 
 		case mRelative:
 		case mBlockMove:
