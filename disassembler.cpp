@@ -497,9 +497,10 @@ void disassembler::flush() {
 
 void disassembler::check_labels() {
 
-	if ( _label_callback && _next_label >= 0 && _pc + _st >= _next_label) {
-		flush();
-		_next_label = _label_callback(_pc);
+	if ( _next_label >= 0 && _pc + _st >= _next_label) {
+		//flush();
+		if (_st) dump();
+		_next_label = next_label(_pc);
 	}
 
 }

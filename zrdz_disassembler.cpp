@@ -43,6 +43,14 @@ zrdz_disassembler::zrdz_disassembler(std::vector<section> &&sections, std::vecto
 		e.symbols.emplace_back(s);
 	}
 
+	// sort labels...
+	for (auto &e : _sections) {
+		if (e.symbols.empty()) continue;
+		std::sort(e.symbols.begin(), e.symbols.end(), [](const symbol &a, const symbol &b) {
+			return a.offset > b.offset;
+		});
+	}
+
 	if (_sections.size() < 5) _sections.resize(5);
 	_sections[SECT_PAGE0].name = "page0";
 	_sections[SECT_CODE].name = "code";
