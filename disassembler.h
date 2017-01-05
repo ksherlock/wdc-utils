@@ -9,6 +9,7 @@ class disassembler {
 	
 	public:
 		disassembler() = default;
+		virtual ~disassembler();
 
 		void operator()(uint8_t byte);
 		void operator()(const std::string &expr, unsigned size);
@@ -53,6 +54,17 @@ class disassembler {
 			else _next_label = -1;
 		}
 
+		static std::string to_x(uint32_t value, unsigned bytes, char prefix = 0);
+
+		static void emit(const std::string &label);
+		static void emit(const std::string &label, const std::string &opcode);
+		static void emit(const std::string &label, const std::string &opcode, const std::string &operand);
+
+	protected:
+
+		virtual int32_t next_label(int32_t pc) {
+			return -1;
+		}
 
 	private:
 

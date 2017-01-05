@@ -333,8 +333,21 @@ static constexpr const int modes[] =
 
 };
 
+constexpr const int kOpcodeTab = 20;
+constexpr const int kOperandTab = 30;
+constexpr const int kCommentTab = 80;
 
-static std::string to_x(uint32_t x, unsigned bytes, char prefix = 0) {
+
+void indent_to(std::string &line, unsigned position) {
+	if (line.length() < position)
+		line.resize(position, ' ');
+}
+
+
+disassembler::~disassembler() {
+}
+
+std::string disassembler::to_x(uint32_t x, unsigned bytes, char prefix) {
 	std::string s;
 	char buffer[16];
 	if (prefix) s.push_back(prefix);
@@ -356,20 +369,68 @@ static std::string to_x(uint32_t x, unsigned bytes, char prefix = 0) {
 }
 
 
+void disassembler::emit(const std::string &label) {
+	fputs(label.c_str(), stdout);
+	fputc('\n', stdout);
+}
+
+void disassembler::emit(const std::string &label, const std::string &opcode) {
+	std::string tmp;
+	tmp = label;
+
+	int column = tmp.length();
+
+	if (!opcode.empty()) {
+		do {
+			tmp.push_back(' ');
+			column++;
+		} while (column < kOpcodeTab);
+		tmp += opcode;
+	}
+
+	tmp.push_back('\n');
+	fputs(tmp.c_str(), stdout);
+}
+
+
+
+void disassembler::emit(const std::string &label, const std::string &opcode, const std::string &operand) {
+
+	std::string tmp;
+	tmp = label;
+
+	int column = tmp.length();
+
+	if (!opcode.empty()) {
+		do {
+			tmp.push_back(' ');
+			column++;
+		} while (column < kOpcodeTab);
+		tmp += opcode;
+	}
+
+	column = tmp.length();
+	if (!operand.empty()) {
+		do {
+			tmp.push_back(' ');
+			column++;
+		} while (column < kOperandTab);
+		tmp += operand;
+	}
+
+	tmp.push_back('\n');
+	fputs(tmp.c_str(), stdout);
+}
+
+
+
 
 void disassembler::reset() {
 	_arg = 0;
 	_st = 0;
 }
 
-constexpr const int kOpcodeTab = 20;
-constexpr const int kOperandTab = 30;
-constexpr const int kCommentTab = 80;
 
-void indent_to(std::string &line, unsigned position) {
-	if (line.length() < position)
-		line.resize(position, ' ');
-}
 
 
 void disassembler::dump() {
@@ -430,6 +491,7 @@ void disassembler::dump(const std::string &expr, unsigned size) {
 
 void disassembler::flush() {
 	if (_st) dump();
+	check_labels();
 }
 
 

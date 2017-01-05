@@ -1,3 +1,6 @@
+#ifndef __obj816_h__
+#define __obj816_h__
+
 #include <stdint.h>
 
 #pragma pack(push, 1)
@@ -174,3 +177,5 @@ enum {SECT_PAGE0, SECT_CODE, SECT_KDATA, SECT_DATA, SECT_UDATA };
 /**************************************************/
 
 #pragma pack(pop)
+
+#endif

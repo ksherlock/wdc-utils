@@ -2,7 +2,7 @@ LINK.o = $(LINK.cc)
 CXXFLAGS = -std=c++11 -g
 CCFLAGS = -g
 
-OBJS = dumpobj.o disassembler.o
+OBJS = dumpobj.o disassembler.o zrdz_disassembler.o
 
 #UNAME_S := $(shell uname -s)
 #ifeq ($(UNAME_S),MINGW64_NT-10.0)
@@ -16,7 +16,8 @@ dumpobj : $(OBJS)
 
 
 disassembler.o : disassembler.cpp disassembler.h
-dumpobj.o : dumpobj.cpp disassembler.h
+zrdz_disassembler.o : zrdz_disassembler.cpp zrdz_disassembler.h disassembler.h
+dumpobj.o : dumpobj.cpp zrdz_disassembler.h disassembler.h
 mingw/err.o : mingw/err.c mingw/err.h
 
 .PHONY: clean
