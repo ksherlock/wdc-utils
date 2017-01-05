@@ -5,7 +5,7 @@
 		extern extern_label
 
 		public public_label
-		public public_equ, public_gequ
+		public public_equ, public_gequ, variable
 
 private_label
 public_label
@@ -28,7 +28,10 @@ page0_label
 			code
 			nop
 code_equ	equ $1234
+variable	var $0000
+variable	var variable+1
 code_label
+			lda #extern_label
 			ends
 
 			data

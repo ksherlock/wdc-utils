@@ -1,4 +1,4 @@
-  Wed Jan  4 2017 13:51                                                Page 1
+  Thu Jan  5 2017 15:23                                                Page 1
 
 
                      ***************************************
@@ -14,7 +14,7 @@
      5                        		extern extern_label
      6                        
      7                        		public public_label
-     8                        		public public_equ, public_gequ
+     8                        		public public_equ, public_gequ, variable
      9                        
     10                        private_label
     11                        public_label
@@ -37,43 +37,46 @@
     28                        			code
     29 00:0000: EA           			nop
     30             00001234   code_equ	equ $1234
-    31                        code_label
-    32                        			ends
-    33                        
-    34                        			data
-    35 00:0000: EA           			nop
-    36             00001234   data_equ	equ $1234
-    37                        data_label
-    38                        			ends
-    39                        
-    40                        			udata
-    41 00:0000: EA           			nop
-    42             00001234   udata_equ	equ $1234
-    43                        udata_label
-    44                        			ends
-    45                        
-    46                        			kdata
-    47 00:0000: EA           			nop
-    48             00001234   kdata_equ	equ $1234
-    49                        kdata_label
-    50                        			ends
-    51                        
-    52                        offset_s	section	offset $200
-  Wed Jan  4 2017 13:51                                                Page 2
+    31             00000000   variable	var $0000
+    32             00000001   variable	var variable+1
+    33                        code_label
+    34 00:0001: A9 xx xx     			lda #extern_label
+    35                        			ends
+    36                        
+    37                        			data
+    38 00:0000: EA           			nop
+    39             00001234   data_equ	equ $1234
+    40                        data_label
+    41 00:0001:              			ends
+    42                        
+    43                        			udata
+    44 00:0000: EA           			nop
+    45             00001234   udata_equ	equ $1234
+    46                        udata_label
+    47 00:0001:              			ends
+    48                        
+    49                        			kdata
+    50 00:0000: EA           			nop
+    51             00001234   kdata_equ	equ $1234
+    52                        kdata_label
+  Thu Jan  5 2017 15:23                                                Page 2
 
 
-    53 00:0200: EA           			nop
-    54             00000201   offset_equ	equ *
-    55                        offset_label
-    56 00:0201:              			ends
-    57                        
-    58                        indir_s	section	indirect $200
-    59 00:0200: EA           			nop
-    60             00000201   indir_equ	equ *
-    61                        indir_label
-    62 00:0201:              			ends
-    63                        
+    53 00:0001:              			ends
+    54                        
+    55                        offset_s	section	offset $200
+    56 00:0200: EA           			nop
+    57             00000201   offset_equ	equ *
+    58                        offset_label
+    59 00:0201:              			ends
+    60                        
+    61                        indir_s	section	indirect $200
+    62 00:0200: EA           			nop
+    63             00000201   indir_equ	equ *
+    64                        indir_label
+    65 00:0201:              			ends
+    66                        
 
 
-      Lines assembled: 63
+      Lines assembled: 66
       Errors: 0

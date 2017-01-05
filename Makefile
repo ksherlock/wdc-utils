@@ -13,7 +13,7 @@ endif
 
 
 wdcdumpobj : $(OBJS)
-
+	$(LINK.o) $^ $(LDLIBS) -o $@
 
 disassembler.o : disassembler.cpp disassembler.h
 zrdz_disassembler.o : zrdz_disassembler.cpp zrdz_disassembler.h disassembler.h
@@ -22,7 +22,7 @@ mingw/err.o : mingw/err.c mingw/err.h
 
 .PHONY: clean
 clean:
-	$(RM) dumpobj $(OBJS)
+	$(RM) wdcdumpobj $(OBJS)
 
 
 .PHONY: variables

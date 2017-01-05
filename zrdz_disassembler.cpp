@@ -3,6 +3,8 @@
 #include <err.h>
 #include <stdio.h>
 
+#include <algorithm>
+
 static constexpr const int equ_type = (ST_EQU << 4) | S_ABS;
 
 zrdz_disassembler::zrdz_disassembler(std::vector<section> &&sections, std::vector<symbol> &&symbols) :
