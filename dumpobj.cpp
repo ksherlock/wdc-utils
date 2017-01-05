@@ -244,9 +244,7 @@ bool dump_obj(const char *name, int fd)
 	zrdz_disassembler d(read_sections(section_data), read_symbols(symbol_data));
 
 	uint8_t op = REC_END;
-	unsigned section = SECT_CODE; // default section = CODE
 	unsigned line = 0;
-	std::string file;
 
 
 	d.front_matter(std::string(oname.data()));
@@ -393,7 +391,7 @@ bool dump_obj(const char *name, int fd)
 								d.emit("", "longi", "off");
 								break;
 							case D_C_FILE: {
-								file = read_cstring(iter);
+								std::string file = read_cstring(iter);
 								line = read_16(iter);
 								std::string tmp = file + ", " + std::to_string(line);
 								d.emit("", ".file", tmp);
@@ -539,11 +537,8 @@ bool dump_obj(const char *name, int fd)
 			}
 
 			case REC_SPACE: {
-				d.flush();
 				uint16_t count = read_16(iter);
-				// todo -- need to coordinate with label printer/disassembler.
-				d.emit("", "ds", d.to_x(count, 4, '$'));
-				d.set_pc(d.pc() + count);
+				d.space(count);
 				break;
 			}
 

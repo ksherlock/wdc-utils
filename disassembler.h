@@ -19,6 +19,7 @@ class disassembler {
 		template<class T>
 		void operator()(const T &t) { code(std::begin(t), std::end(t)); }
 
+		void space(unsigned bytes);
 
 		bool m() const { return _flags & 0x20; }
 		bool x() const { return _flags & 0x10; }

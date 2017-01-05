@@ -498,12 +498,51 @@ void disassembler::flush() {
 void disassembler::check_labels() {
 
 	if ( _next_label >= 0 && _pc + _st >= _next_label) {
-		//flush();
+		//flush(); // -- too recursive.  see above.
 		if (_st) dump();
 		_next_label = next_label(_pc);
 	}
 
 }
+
+
+void disassembler::space(unsigned size) {
+	flush();
+
+	std::string line;
+
+	indent_to(line, kOpcodeTab);
+	line += "ds";
+	indent_to(line, kOperandTab);
+
+
+	while (size) {
+		uint32_t chunk;
+		if (_next_label == -1) chunk = size;
+		else {
+			chunk = _next_label - _pc;
+			chunk = std::min(chunk, size);
+		}
+
+		line.resize(kOperandTab);
+		line += std::to_string(chunk);
+		indent_to(line, kCommentTab);
+		line += "; ";
+
+		line += to_x(_pc, 4);
+		line.push_back(':');
+		line.push_back('\n');
+		fputs(line.c_str(), stdout);	
+
+
+		_pc += chunk;
+		size -= chunk;
+		if (_next_label == _pc) _next_label = next_label(_pc);
+	}
+
+
+}
+
 
 void disassembler::operator()(const std::string &expr, unsigned size) {
 
@@ -564,6 +603,8 @@ void disassembler::operator()(uint8_t byte) {
 	// all done... now print it.
 	print();
 }
+
+
 
 void disassembler::print_prefix() {
 
