@@ -123,7 +123,7 @@ void zrdz_disassembler::front_matter(const std::string &module) {
 
 }
 
-void zrdz_disassembler::back_matter() {
+void zrdz_disassembler::back_matter(unsigned flags) {
 
 	flush();
 	_section = -1;
@@ -147,6 +147,24 @@ void zrdz_disassembler::back_matter() {
 		// ...check for symbols?
 	}
 
+
+	if (flags & 0x01) {
+		fputs("; sections\n", stdout);
+		for (const auto &e : _sections) {
+			if (!e.valid) continue;
+			printf("; %-20s %02x %02x %04x %04x\n",
+				e.name.c_str(), e.number, e.flags, e.size, e.org);
+		}
+
+		fputs(";\n", stdout);
+
+		fputs("; symbols\n", stdout);
+		for (const auto &s : _symbols) {
+			printf("; %-20s %02x %02x %02x %08x\n",
+				s.name.c_str(), s.type, s.flags, s.section, s.offset);
+		}
+		putchar('\n');
+	}
 
 
 	emit("", "endmod");
@@ -243,7 +261,7 @@ void zrdz_disassembler::set_section(int section) {
 		return;
 	}
 	auto &e = _sections[section];
-	if (!e.valid) {
+	if (section >5 && !e.valid) {
 		warnx("Invalid section %d", section);
 		return;		
 	}

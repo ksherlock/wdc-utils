@@ -186,9 +186,6 @@ std::vector<symbol> read_symbols(const std::vector<uint8_t> &symbol_data) {
 
 bool dump_obj(const char *name, int fd)
 {
-	static const char *kSections[] = { "PAGE0", "CODE", "KDATA", "DATA", "UDATA" };
-	static const char *kTypes[] = { "S_UND", "S_ABS", "S_REL", "S_EXP", "S_REG", "S_FREG" };
-
 	Mod_head h;
 	ssize_t ok;
 
@@ -275,9 +272,6 @@ bool dump_obj(const char *name, int fd)
 					// todo -- move all this stuff to a separate function.
 					uint8_t size = read_8(iter);
 
-					char buffer[32];
-
-
 					std::vector<std::string> stack;
 
 					// todo -- need to keep operation for precedence?
@@ -348,25 +342,6 @@ bool dump_obj(const char *name, int fd)
 
 			case REC_DEBUG:
 				{
-					static const char *debugs[] = {
-						"D_C_FILE",
-						"D_C_LINE",
-						"D_C_SYM",
-						"D_C_STAG",
-						"D_C_ETAG",
-						"D_C_UTAG",
-						"D_C_MEMBER",
-						"D_C_EOS",
-						"D_C_FUNC",
-						"D_C_ENDFUNC",
-						"D_C_BLOCK",
-						"D_C_ENDBLOCK",
-						"D_LONGA_ON",
-						"D_LONGA_OFF",
-						"D_LONGI_ON",
-						"D_LONGI_OFF",
-					};
-
 					d.flush();
 					uint16_t size = read_16(iter);
 
@@ -404,17 +379,17 @@ bool dump_obj(const char *name, int fd)
 							}
 							case D_C_BLOCK: {
 								uint16_t block = read_16(iter);
-								d.emit("",".block", std::to_string(line));
+								d.emit("",".block", std::to_string(block));
 								break;
 							}
 							case D_C_ENDBLOCK: {
-								uint16_t line = read_16(iter);
-								d.emit("",".endblock", std::to_string(line));
+								uint16_t block = read_16(iter);
+								d.emit("",".endblock", std::to_string(block));
 								break;
 							}
 							case D_C_FUNC: {
 								uint16_t arg = read_16(iter);
-								d.emit("",".function", std::to_string(line));
+								d.emit("",".function", std::to_string(arg));
 								break;								
 							}
 							case D_C_ENDFUNC: {
@@ -555,27 +530,13 @@ bool dump_obj(const char *name, int fd)
 	}
 
 
-	d.back_matter();
+	unsigned f = 0;
+	if (flags._S) f |= 0x01;
+	d.back_matter(f);
 
 	if (iter != data.end() || op != REC_END) errx(EX_DATAERR, "%s records ended early", name);
 
-#if 0
-	if (flags._S) {
-		printf("; sections\n");
-		for (auto &s : sections) {
-			printf("; %-20s %02x %02x %04x %04x\n",
-				s.name.c_str(), s.number, s.flags, s.size, s.org);
-		}
 
-		printf(";\n");
-
-		printf("; symbols\n");
-		for (auto &s : symbols) {
-			printf("; %-20s %02x %02x %02x %08x\n",
-				s.name.c_str(), s.type, s.flags, s.section, s.offset);
-		}
-	}
-#endif
 
 	return true;
 }

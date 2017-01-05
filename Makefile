@@ -1,5 +1,5 @@
 LINK.o = $(LINK.cc)
-CXXFLAGS = -std=c++11 -g
+CXXFLAGS = -std=c++11 -g -Wall
 CCFLAGS = -g
 
 OBJS = dumpobj.o disassembler.o zrdz_disassembler.o
@@ -12,7 +12,7 @@ ifeq ($(MSYSTEM),MINGW64)
 endif
 
 
-dumpobj : $(OBJS)
+wdcdumpobj : $(OBJS)
 
 
 disassembler.o : disassembler.cpp disassembler.h

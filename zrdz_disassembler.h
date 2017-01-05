@@ -35,7 +35,7 @@ public:
 	void set_section(int);
 
 	void front_matter(const std::string &module_name);
-	void back_matter();
+	void back_matter(unsigned flags);
 
 	std::string location_name(unsigned section, uint32_t offset) const;
 	std::string symbol_name(unsigned entry) const;
