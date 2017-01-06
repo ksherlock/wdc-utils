@@ -65,6 +65,7 @@ private:
 
 	void print_section(const entry &e);
 	void print_externs();
+	void print_variables();
 	void print_globals(int section);
 	void print_equs(int section);
 

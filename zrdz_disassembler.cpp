@@ -31,6 +31,7 @@ zrdz_disassembler::zrdz_disassembler(std::vector<section> &&sections, std::vecto
 	for (auto &s : _symbols) {
 
 		if (s.type == S_UND) continue;
+		if (s.flags & SF_VAR) continue;
 
 		if (s.section >= _sections.size()) {
 			warnx("invalid section %d for symbol %s", s.section, s.name.c_str());
@@ -81,6 +82,7 @@ void zrdz_disassembler::front_matter(const std::string &module) {
 	emit("", "module", module);
 	putchar('\n');
 	print_externs();
+	print_variables();
 
 	// reference-only sections.
 	for (auto &e : _sections) {
@@ -175,8 +177,6 @@ void zrdz_disassembler::back_matter(unsigned flags) {
 
 void zrdz_disassembler::print_externs() {
 
-
-
 	std::vector<std::string> tmp;
 
 	for (auto &s : _symbols) {
@@ -186,6 +186,34 @@ void zrdz_disassembler::print_externs() {
 	if (tmp.empty()) return;
 	std::sort(tmp.begin(), tmp.end());
 	for (const auto &s : tmp) emit("", "extern", s);
+	putchar('\n');
+
+}
+
+
+// for sorting symbols by name.
+bool operator<(const symbol &a, const symbol &b) {
+	return a.name < b.name;
+}
+
+
+
+void zrdz_disassembler::print_variables() {
+
+	std::vector<symbol> tmp;
+
+	for (auto &s : _symbols) {
+		if (s.flags & SF_VAR) tmp.push_back(s);
+	}
+
+	if (tmp.empty()) return;
+	std::sort(tmp.begin(), tmp.end());
+
+	for (const auto &s : tmp) {
+		if (s.flags & SF_GBL) emit("", "public", s.name);
+		emit(s.name, "var", to_x(s.offset, 4, '$'));
+	}
+
 	putchar('\n');
 
 }
@@ -213,9 +241,7 @@ void zrdz_disassembler::print_equs(int section) {
 	);
 
 	if (tmp.empty()) return;
-	std::sort(tmp.begin(), tmp.end(),
-		[](const symbol &a, const symbol &b) { return a.name < b.name; }
-	);
+	std::sort(tmp.begin(), tmp.end());
 
 	for (const auto &s : tmp) emit(s.name, "gequ", to_x(s.offset, 4, '$'));
 	putchar('\n');
