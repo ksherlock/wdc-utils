@@ -2,19 +2,27 @@ LINK.o = $(LINK.cc)
 CXXFLAGS = -std=c++11 -g -Wall
 CCFLAGS = -g
 
-OBJS = dumpobj.o disassembler.o zrdz_disassembler.o
+DUMP_OBJS = dumpobj.o disassembler.o zrdz_disassembler.o
+LINK_OBJS = link.o expression.o
 
 #UNAME_S := $(shell uname -s)
 #ifeq ($(UNAME_S),MINGW64_NT-10.0)
 ifeq ($(MSYSTEM),MINGW64)
-	OBJS += mingw/err.o
+	DUMP_OBJS += mingw/err.o
+	LINK_OBJS += mingw/err.o
 	CPPFLAGS += -I mingw/
 	LDLIBS += -static
 endif
 
+.PHONY: all
+all: wdcdumpobj wdclink
 
-wdcdumpobj : $(OBJS)
+wdcdumpobj : $(DUMP_OBJS)
 	$(LINK.o) $^ $(LDLIBS) -o $@
+
+wdclink : $(LINK_OBJS)
+	$(LINK.o) $^ $(LDLIBS) -o $@
+
 
 disassembler.o : disassembler.cpp disassembler.h
 zrdz_disassembler.o : zrdz_disassembler.cpp zrdz_disassembler.h disassembler.h
@@ -23,7 +31,7 @@ mingw/err.o : mingw/err.c mingw/err.h
 
 .PHONY: clean
 clean:
-	$(RM) wdcdumpobj $(OBJS)
+	$(RM) wdcdumpobj $(DUMP_OBJS) $(LINK_OBJS)
 
 
 .PHONY: variables

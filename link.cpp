@@ -7,6 +7,7 @@
 #include <sysexits.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <fcntl.h>
 #include <err.h>
 #include <assert.h>
 #include <stdio.h>
@@ -17,11 +18,56 @@
 #include <unordered_map>
 #include <unordered_set>
 #include <array>
+#include <utility>
+#include <numeric>
+#include <iterator>
 
 #include "obj816.h"
 #include "expression.h"
 
 
+#ifndef O_BINARY
+#define O_BINARY 0
+#endif
+
+enum class endian {
+	little = __ORDER_LITTLE_ENDIAN__,
+	big = __ORDER_BIG_ENDIAN__,
+	native = __BYTE_ORDER__
+};
+
+
+template<class T>
+void swap_if(T &t, std::false_type) {}
+
+void swap_if(uint8_t &, std::true_type) {}
+
+void swap_if(uint16_t &value, std::true_type) {
+	value = __builtin_bswap16(value);
+}
+
+void swap_if(uint32_t &value, std::true_type) {
+	value = __builtin_bswap32(value);
+}
+
+void swap_if(uint64_t &value, std::true_type) {
+	value = __builtin_bswap64(value);
+}
+
+template<class T>
+void le_to_host(T &value) {
+	swap_if(value, std::integral_constant<bool, endian::native == endian::big>{});
+}
+
+
+#pragma pack(push, 1)
+struct Header {
+	uint32_t magic;				/* magic number for detection */
+	uint16_t version;			/* version number of object format */
+	uint8_t filetype;			/* file type, object or library */
+};
+
+#pragma pack(pop)
 
 
 struct section {
@@ -33,6 +79,8 @@ struct section {
 	unsigned number = -1;
 	std::vector<uint8_t> data;
 	std::vector<expression> expressions;
+
+	unsigned end_symbol = 0; // auto-generated _END_{name} symbol.
 };
 
 struct symbol {
@@ -495,8 +543,282 @@ void init() {
 }
 
 
+void generate_end() {
+	const std::string names[] = {
+			"_END_PAGE0",
+			"_END_CODE",
+			"_END_KDATA"
+			"_END_DATA"
+			"_END_UDATA"	
+	};
+
+	for (int i = 0; i < 5; ++i) {
+		symbol s;
+		s.section = i;
+		s.type = S_REL;
+		s.flags = SF_DEF | SF_GBL;
+		s.offset = sections[i].data.size();
+
+		symbols[i * 2 + 1] = s;
+	}
+}
+
+void merge_data() {
+
+	// merge data sections -- kdata, data, udata.
+	// merge custom data sections?
+
+	std::vector<uint8_t> new_data;
+	std::vector<expression> new_expr;
+
+	unsigned new_number = 0;
+
+	uint32_t total_data_size = 0;
+	uint32_t total_code_size = 0;
+	for (const auto &s : sections) {
+		if (s.flags & SEC_REF_ONLY) continue;
+		if (s.flags & SEC_DATA) total_data_size += s.data.size();
+		else total_code_size += s.data.size();
+	}
 
 
+	// also merge code if total size is ok...
+	uint32_t size = 0;
+	for (int i = 1; i < 5; ++i) {
+		size += sections[i].data.size();
+	}
+	if (size <= 0xffff) {
+		new_data = std::move(sections[SECT_CODE].data);
+		new_expr = std::move(sections[SECT_CODE].expressions);
+		new_number = 1;
+	}
+
+	std::vector< std::pair<unsigned, uint32_t> > remap;
+	remap.reserve(sections.size());
+
+	for (unsigned i = 0; i < sections.size(); ++i)
+		remap.emplace_back(std::make_pair(i, i));
+
+
+	uint32_t fudge_kdata = 0;
+	uint32_t fudge_data = 0;
+	uint32_t fudge_udata = 0;
+
+	section *s = &sections[SECT_KDATA];
+	fudge_kdata = new_data.size();
+
+	new_data.insert(new_data.end(), s->data.begin(), s->data.end());
+	new_expr.insert(new_expr.end(),
+		std::make_move_iterator(s->expressions.begin()),
+		std::make_move_iterator(s->expressions.end())
+	);
+	*s = section{};
+
+	s = &sections[SECT_DATA];
+	fudge_data = new_data.size();
+
+	new_data.insert(new_data.end(), s->data.begin(), s->data.end());
+	new_expr.insert(new_expr.end(),
+		std::make_move_iterator(s->expressions.begin()),
+		std::make_move_iterator(s->expressions.end())
+	);
+	*s = section{};
+
+
+	s = &sections[SECT_UDATA];
+	fudge_udata = new_data.size();
+
+	new_data.insert(new_data.end(), s->data.begin(), s->data.end());
+	new_expr.insert(new_expr.end(),
+		std::make_move_iterator(s->expressions.begin()),
+		std::make_move_iterator(s->expressions.end())
+	);
+	*s = section{};
+
+
+
+	if (size > 0xffff) {
+		// not merged into code.
+
+		new_number = sections.size();
+
+		section tmp;
+		tmp.name = "data";
+		tmp.flags = SEC_DATA;
+		tmp.data = std::move(new_data);
+		tmp.expressions = std::move(new_expr);
+		sections.emplace_back(tmp);
+	}
+
+
+	// update all symbols with the new location / offset.
+
+	for (auto &s : symbols) {
+		if ((s.type & 0x0f) == S_REL) switch(s.section) {
+			case SECT_DATA:
+				s.section = new_number;
+				s.offset += fudge_data;
+				break;
+			case SECT_KDATA:
+				s.section = new_number;
+				s.offset += fudge_kdata;
+				break;
+			case SECT_UDATA:
+				s.section = new_number;
+				s.offset += fudge_udata;
+				break;
+		}
+	}
+
+	// update expressions with new section / offset.
+	for (auto &s : sections) {
+		for (auto &e : s.expressions) {
+			bool delta = false;
+			for (auto &t : e.stack) {
+				if (t.tag == OP_LOC) {
+					switch(t.section) {
+						case SECT_DATA:
+							t.section = new_number;
+							t.value += fudge_data;
+							delta = true;
+							break;
+						case SECT_KDATA:
+							t.section = new_number;
+							t.value += fudge_kdata;
+							delta = true;
+							break;
+						case SECT_UDATA:
+							t.section = new_number;
+							t.value += fudge_udata;
+							delta = true;
+							break;
+					}
+				}
+			}
+			if (delta) simplify_expression(e);
+		}
+	}
+
+
+
+}
+
+
+bool one_file(const std::string &name) {
+
+	int fd = open(name.c_str(), O_RDONLY | O_BINARY);
+	if (fd < 0) {
+		warn("Unable to open %s", name.c_str());
+		return false;
+	}
+	bool rv = false;
+
+	Header h;
+	ssize_t ok;
+
+	ok = read(fd, &h, sizeof(h));
+	if (ok != sizeof(h)) {
+		warnx("Invalid object file: %s", name.c_str());
+		close(fd);
+		return false;
+	}
+
+	le_to_host(h.magic);
+	le_to_host(h.version);
+	le_to_host(h.filetype);
+
+	if (h.magic != MOD_MAGIC || h.version != MOD_VERSION || h.filetype < MOD_OBJECT || h.filetype > MOD_LIBRARY) {
+		warnx("Invalid object file: %s", name.c_str());
+		close(fd);
+		return false;
+	}
+
+	if (h.filetype == MOD_LIBRARY) {
+		warnx("%s is a library", name.c_str());
+		close(fd);
+		// todo -- add to library list...
+		return true;
+	}
+
+	//
+	rv = true;
+	lseek(fd, 0, SEEK_SET);
+	for(;;) {
+		Mod_head h;
+
+		ok = read(fd, &h, sizeof(h));
+		if (ok == 0) break; // eof.
+
+		rv = false;
+		if (ok < sizeof(h)) {
+			warnx("Invalid object file: %s", name.c_str());
+			break;
+		}
+
+		le_to_host(h.h_magic);
+		le_to_host(h.h_version);
+		le_to_host(h.h_filtyp);
+		le_to_host(h.h_namlen);
+		le_to_host(h.h_recsize);
+		le_to_host(h.h_secsize);
+		le_to_host(h.h_symsize);
+		le_to_host(h.h_optsize);
+		le_to_host(h.h_tot_secs);
+		le_to_host(h.h_num_secs);
+		le_to_host(h.h_num_syms);
+
+		assert(h.h_magic == MOD_MAGIC);
+		assert(h.h_version == 1);
+		assert(h.h_filtyp == 1);
+
+
+		std::string module_name;
+		{
+			// now read the name (h_namlen includes 0 terminator.)
+			std::vector<char> tmp;
+			tmp.resize(h.h_namlen);
+			ok = read(fd, tmp.data(), h.h_namlen);
+			if (ok != h.h_namlen) {
+				warnx("Invalid object file: %s", name.c_str());
+				break;
+			}
+			module_name.assign(tmp.data());
+		}
+
+		std::vector<uint8_t> record_data;
+		std::vector<uint8_t> symbol_data;
+		std::vector<uint8_t> section_data;
+
+		record_data.resize(h.h_recsize);
+		ok = read(fd, record_data.data(), h.h_recsize);
+		if (ok != h.h_recsize) {
+			warnx("Truncated object file: %s", name.c_str());
+			break;
+		}
+
+		section_data.resize(h.h_secsize);
+		ok = read(fd, section_data.data(), h.h_secsize);
+		if (ok != h.h_secsize) {
+			warnx("Truncated object file: %s", name.c_str());
+			break;
+		}
+
+		symbol_data.resize(h.h_symsize);
+		ok = read(fd, symbol_data.data(), h.h_symsize);
+		if (ok != h.h_symsize)  {
+			warnx("Truncated object file: %s", name.c_str());
+			break;
+		}
+
+		// should probably pass in name and module....
+		one_module(record_data, section_data, symbol_data);
+		rv = true;
+	}
+
+
+	close(fd);
+	return rv;
+}
 
 void help() {
 	exit(0);
@@ -536,6 +858,27 @@ int main(int argc, char **argv) {
 	argv += optind;
 
 	if (argc == 0) usage();
+
+	init();
+
+	for (int i = 0 ; i < argc; ++i) {
+		one_file(argv[i]);
+	}
+
+	//
+	simplify();
+
+	// for each undefined, try to find it in a library...
+
+	for (const auto & s : undefined_symbols) {
+		printf("%s\n", s.c_str());
+	}
+
+	generate_end();
+
+	merge_data();
+
+
 
 }
 
