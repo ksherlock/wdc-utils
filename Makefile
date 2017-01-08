@@ -9,6 +9,7 @@ OBJS = dumpobj.o disassembler.o zrdz_disassembler.o
 ifeq ($(MSYSTEM),MINGW64)
 	OBJS += mingw/err.o
 	CPPFLAGS += -I mingw/
+	LDLIBS += -static
 endif
 
 
