@@ -72,7 +72,7 @@ void usage() {
 struct Header {
 	uint32_t magic;				/* magic number for detection */
 	uint16_t version;			/* version number of object format */
-	uint8_t filetype;				/* file type, object or library */
+	uint8_t filetype;			/* file type, object or library */
 };
 
 #pragma pack(pop)
