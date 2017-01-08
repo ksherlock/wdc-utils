@@ -1,0 +1,83 @@
+  Sun Jan  8 2017 12:55                                                Page 1
+
+
+                     ***************************************
+                     **      WDC 65C816 Macro Assembler   **
+                     **                                   **
+                     **     Version 3.49.1- Feb  6 2006    **
+                     ***************************************
+
+     1                        
+     2                        	;
+     3                        	; test ref-only sections (PAGE0, UDATA)
+     4                        	;
+     5                        	;
+     6                        
+     7                        	module part_1
+     8                        
+     9                        	globals on
+    10                        	externs on
+    11                        
+    12                        	page0
+    13                        page0_start
+    14                        
+    15 00:0000:              offset_0	ds 2
+    16 00:0002:              offset_2	ds 4
+    17 00:0006:              	ends
+    18                        
+    19                        	udata
+    20                        
+    21 00:0000:              uoffset_0	ds 2
+    22 00:0002:              uoffset_4	ds 4
+    23 00:0006:              			ds 1024-4
+    24 00:0402:              	ends
+    25                        
+    26                        	code
+    27                        	longa on
+    28                        	longi on
+    29 00:0000: A5 xx        	lda offset_0
+    30 00:0002: A5 xx        	lda offset_2
+    31 00:0004: AD xx xx     	lda uoffset_0
+    32 00:0007: AD xx xx     	lda uoffset_4
+    33                        	ends
+    34                        
+    35                        
+    36                        	endmod
+    37                        
+    38                        	module part_2
+    39                        
+    40                        	globals on
+    41                        	externs on
+    42                        
+    43                        
+    44                        	page0
+    45 00:0000:              uoffset_6	ds 2
+    46 00:0002:              uoffset_8	ds 4
+    47 00:0006:              	ends
+    48                        
+    49                        	udata
+    50 00:0000:              uoffset_1024 ds 1024
+    51 00:0400:              uoffset_2048 ds 1024
+    52 00:0800:              	ends
+  Sun Jan  8 2017 12:55                                                Page 2
+
+
+    53                        
+    54                        	code
+    55                        	longa on
+    56                        	longi on
+    57                        
+    58 00:0000: A9 xx xx     	lda #_BEG_PAGE0
+    59 00:0003: A9 xx xx     	lda #_END_PAGE0
+    60 00:0006: A9 xx xx     	lda #_BEG_UDATA
+    61 00:0009: A9 xx xx     	lda #_END_UDATA
+    62 00:000C: A9 xx xx     	lda #_BEG_DATA
+    63 00:000F: A9 xx xx     	lda #_END_DATA
+    64                        	ends
+    65                        
+    66                        
+    67                        	endmod
+
+
+      Lines assembled: 67
+      Errors: 0
