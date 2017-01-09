@@ -374,3 +374,21 @@ std::string zrdz_disassembler::symbol_name(unsigned entry) const {
 	}
 	return _symbols[entry].name;
 }
+
+std::string zrdz_disassembler::section_name(unsigned section) const {
+
+	std::string defname = std::string("section") + std::to_string(section);
+
+	if (section >= _sections.size()) {
+		warnx("Invalid section %d", section);
+		return defname;
+	}
+	auto &e = _sections[section];
+	if (!e.valid) {
+		warnx("Invalid section %d", section);
+		return defname;
+	}
+
+	return e.name;
+}
+

@@ -39,6 +39,7 @@ public:
 
 	std::string location_name(unsigned section, uint32_t offset) const;
 	std::string symbol_name(unsigned entry) const;
+	std::string section_name(unsigned entry) const;
 
 protected:
 

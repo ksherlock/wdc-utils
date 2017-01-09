@@ -30,6 +30,7 @@
 struct {
 	bool _S = false;
 	bool _g = false;
+	bool _n = false;
 } flags;
 
 
@@ -285,7 +286,13 @@ bool dump_obj(const char *name, int fd)
 								uint8_t section = read_8(iter);
 								uint32_t offset = read_32(iter);
 
-								std::string name = d.location_name(section, offset);
+
+								std::string name;
+								if (flags._n) {
+									name = d.section_name(section) + "+" + d.to_x(offset, 4, '$');
+								} else {
+									name = d.location_name(section, offset);
+								}
 								stack.emplace_back(std::move(name));
 								break;
 							}
@@ -636,10 +643,11 @@ void dump(const char *name) {
 int main(int argc, char **argv) {
 
 	int c;
-	while ((c = getopt(argc, argv, "Sg")) != -1) {
+	while ((c = getopt(argc, argv, "Sgn")) != -1) {
 			switch(c) {
 				case 'S': flags._S = true; break;
 				case 'g': flags._g = true; break;
+				case 'n': flags._n = true; break;
 				default: exit(EX_USAGE); break;
 			}
 	}
