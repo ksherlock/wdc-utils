@@ -4,6 +4,8 @@
 #include <stdint.h>
 #include <vector>
 
+#include "optional.h"
+
 struct expr {
 	expr(int t = 0, uint32_t v = 0, uint32_t s = 0)
 		: tag(t), value(v), section(s)
@@ -25,7 +27,7 @@ struct expression {
 
 };
 
-uint32_t evaluate_expression(expression &e, bool force = false);
+optional<uint32_t> evaluate_expression(expression &e, bool force = false);
 
 bool simplify_expression(expression &e);
 

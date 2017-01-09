@@ -145,9 +145,7 @@ bool simplify_expression(expression &e) {
  * if force is true, treat OP_LOC records as OP_VAL (for omf)
  */
 
-// should return std::optional<uint32_t>...
-
-uint32_t evaluate_expression(expression &e, bool force) {
+optional<uint32_t> evaluate_expression(expression &e, bool force) {
 	std::vector<expr> tmp;
 	for (const auto &t : e.stack) {
 		if (t.tag == OP_LOC && force) {
@@ -163,7 +161,7 @@ uint32_t evaluate_expression(expression &e, bool force) {
 		}
 	}
 
-	if (tmp.size() == 1 && tmp.front().tag == OP_VAL) return tmp.front().value;
-	return 0;
+	if (tmp.size() == 1 && tmp.front().tag == OP_VAL) return optional<uint32_t>(tmp.front().value);
+	return optional<uint32_t>();
 }
 
