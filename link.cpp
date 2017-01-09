@@ -30,6 +30,14 @@
 #define O_BINARY 0
 #endif
 
+
+struct {
+	bool _v = false;
+	bool _C = false;
+	bool _X = false;
+	unsigned _errors = 0;
+} flags;
+
 enum class endian {
 	little = __ORDER_LITTLE_ENDIAN__,
 	big = __ORDER_BIG_ENDIAN__,
@@ -272,7 +280,12 @@ void one_module(const std::vector<uint8_t> &data, const std::vector<uint8_t> &se
 
 	// convert local sections to global 
 	for (auto &s : local_sections) {
-		if (s.number <= SECT_UDATA) continue;
+		if (s.number <= SECT_UDATA) {
+			sections[s.number].size += s.size; // for page0 / udata sections.
+			continue;
+		}
+
+		// todo -- should install section name as global symbol?
 
 		auto iter = section_map.find(s.name);
 		if (iter == section_map.end()) {
@@ -282,10 +295,13 @@ void one_module(const std::vector<uint8_t> &data, const std::vector<uint8_t> &se
 			sections.emplace_back(s);
 			symbol_map.emplace(s.name, virtual_section);
 		} else {
-			const auto &ss = sections[iter->second];
+			auto &ss = sections[iter->second];
 			assert(ss.flags == s.flags); // check org????
 			remap_section[s.number] = iter->second;
 			s.number = iter->second;
+
+			// update size (for ref-only sections)
+			ss.size += s.size;
 		}
 	}
 
@@ -335,7 +351,10 @@ void one_module(const std::vector<uint8_t> &data, const std::vector<uint8_t> &se
 				}
 				else {
 					// ok if symbols are identical..
-					assert(ss.type == ss.type && ss.flags == s.flags && ss.section == s.section && ss.offset == s.offset);
+					if (ss.type != s.type || ss.flags != s.flags || ss.section != s.section || ss.offset != s.offset) {
+						warnx("Duplicate label %s", s.name.c_str());
+						flags._errors++;
+					} 
 				}
 			}
 
@@ -349,7 +368,6 @@ void one_module(const std::vector<uint8_t> &data, const std::vector<uint8_t> &se
 		uint8_t op = read_8(iter);
 		if (op == REC_END) return;
 
-		++iter;
 		if (op < 0xf0) {
 			data_ptr->insert(data_ptr->end(), iter, iter + op);
 			iter += op;
@@ -475,7 +493,11 @@ void one_module(const std::vector<uint8_t> &data, const std::vector<uint8_t> &se
 }
 
 
-
+/*
+ * n.b -- UDATA and PAGE0 are ref only, therefore no data is generated.
+ * as a special case for UDATA (but not PAGE0) have a flag so it will be 0-filled and generate data?
+ *
+ */
 void init() {
 
 	sections.resize(5);
@@ -513,9 +535,9 @@ void init() {
 	static std::string names[] = {
 			"_BEG_PAGE0", "_END_PAGE0",
 			"_BEG_CODE", "_END_CODE",
-			"_BEG_KDATA", "_END_KDATA"
-			"_BEG_DATA", "_END_DATA"
-			"_BEG_UDATA", "_END_UDATA"
+			"_BEG_KDATA", "_END_KDATA",
+			"_BEG_DATA", "_END_DATA",
+			"_BEG_UDATA", "_END_UDATA",
 	};
 
 	for (int i = 0; i < 5; ++i) {
@@ -575,100 +597,111 @@ void merge_data() {
 
 	uint32_t total_data_size = 0;
 	uint32_t total_code_size = 0;
+	unsigned data_sections = 0;
+	unsigned code_sections = 0;
+
 	for (const auto &s : sections) {
 		if (s.flags & SEC_REF_ONLY) continue;
-		if (s.flags & SEC_DATA) total_data_size += s.data.size();
-		else total_code_size += s.data.size();
+		if (s.flags & SEC_DATA) {
+			total_data_size += s.data.size();
+			data_sections++;
+		}
+		else {
+			if (s.data.size() > 0xffff) {
+				flags._errors++;
+				warnx("code section %s ($%04x) exceeds bank size.",
+					s.name.c_str(), (uint32_t)s.data.size());
+			}
+			total_code_size += s.data.size();
+			code_sections++;
+		}
+	}
+
+	// add in udata...
+	total_data_size += sections[SECT_UDATA].size;
+
+
+	if (sections[SECT_CODE].data.size() + total_data_size < 0xffff) {
+		auto &s = sections[SECT_CODE];
+		new_number = SECT_CODE;
+		new_data = std::move(s.data);
+		new_expr = std::move(s.expressions);
+		s.data.clear();
+		s.expressions.clear();
+	} else {
+		new_number = SECT_DATA;
 	}
 
 
-	// also merge code if total size is ok...
-	uint32_t size = 0;
-	for (int i = 1; i < 5; ++i) {
-		size += sections[i].data.size();
-	}
-	if (size <= 0xffff) {
-		new_data = std::move(sections[SECT_CODE].data);
-		new_expr = std::move(sections[SECT_CODE].expressions);
-		new_number = 1;
-	}
-
+	// new section, offset fudge pair.
 	std::vector< std::pair<unsigned, uint32_t> > remap;
 	remap.reserve(sections.size());
 
 	for (unsigned i = 0; i < sections.size(); ++i)
-		remap.emplace_back(std::make_pair(i, i));
+		remap.emplace_back(std::make_pair(i, 0));
 
 
-	uint32_t fudge_kdata = 0;
-	uint32_t fudge_data = 0;
-	uint32_t fudge_udata = 0;
-
-	section *s = &sections[SECT_KDATA];
-	fudge_kdata = new_data.size();
-
-	new_data.insert(new_data.end(), s->data.begin(), s->data.end());
-	new_expr.insert(new_expr.end(),
-		std::make_move_iterator(s->expressions.begin()),
-		std::make_move_iterator(s->expressions.end())
-	);
-	*s = section{};
-
-	s = &sections[SECT_DATA];
-	fudge_data = new_data.size();
-
-	new_data.insert(new_data.end(), s->data.begin(), s->data.end());
-	new_expr.insert(new_expr.end(),
-		std::make_move_iterator(s->expressions.begin()),
-		std::make_move_iterator(s->expressions.end())
-	);
-	*s = section{};
-
-
-	s = &sections[SECT_UDATA];
-	fudge_udata = new_data.size();
-
-	new_data.insert(new_data.end(), s->data.begin(), s->data.end());
-	new_expr.insert(new_expr.end(),
-		std::make_move_iterator(s->expressions.begin()),
-		std::make_move_iterator(s->expressions.end())
-	);
-	*s = section{};
-
-
-
-	if (size > 0xffff) {
-		// not merged into code.
-
-		new_number = sections.size();
-
-		section tmp;
-		tmp.name = "data";
-		tmp.flags = SEC_DATA;
-		tmp.data = std::move(new_data);
-		tmp.expressions = std::move(new_expr);
-		sections.emplace_back(tmp);
+	if (total_data_size > 0xffff) {
+		warnx("total data ($%04x) exceeds bank size,", total_data_size);
 	}
 
 
-	// update all symbols with the new location / offset.
+	// merge all code sections?
+	if (total_code_size <= 0xffff && code_sections > 0) {
 
+	}
+
+
+	for (auto &s : sections) {
+		if (s.flags & SEC_REF_ONLY) continue;
+		if ((s.flags & SEC_DATA) == 0) continue;
+
+		uint32_t offset = new_data.size();
+		remap[s.number] = std::make_pair(new_number, offset);
+		new_data.insert(new_data.end(), s.data.begin(), s.data.end());
+		new_expr.insert(new_expr.end(), 
+			std::make_move_iterator(s.expressions.begin()),
+			std::make_move_iterator(s.expressions.end())
+		);
+
+		// preserve the name and flags.
+		s.data.clear();
+		s.expressions.clear();
+		s.size = 0;
+	}
+
+	// add in SECT_UDATA
+	{
+		auto &s = sections[SECT_UDATA];
+		uint32_t offset = new_data.size();
+
+		remap[s.number] = std::make_pair(new_number, offset);
+		// reference only -- no expressions or data.
+		new_data.insert(new_data.end(), s.size, 0);
+
+		s.size = 0;
+	}
+
+	{
+		auto &s = sections[new_number];
+		s.size = new_data.size();
+		s.data = std::move(new_data);
+		s.expressions = std::move(new_expr);
+	}
+
+
+
+
+	// now remap symbols
 	for (auto &s : symbols) {
-		if ((s.type & 0x0f) == S_REL) switch(s.section) {
-			case SECT_DATA:
-				s.section = new_number;
-				s.offset += fudge_data;
-				break;
-			case SECT_KDATA:
-				s.section = new_number;
-				s.offset += fudge_kdata;
-				break;
-			case SECT_UDATA:
-				s.section = new_number;
-				s.offset += fudge_udata;
-				break;
+		if ((s.type & 0x0f) == S_REL) {
+			auto x = remap[s.section];
+			s.section = x.first;
+			s.offset += x.second;
 		}
 	}
+
+	// and expressions...
 
 	// update expressions with new section / offset.
 	for (auto &s : sections) {
@@ -676,29 +709,17 @@ void merge_data() {
 			bool delta = false;
 			for (auto &t : e.stack) {
 				if (t.tag == OP_LOC) {
-					switch(t.section) {
-						case SECT_DATA:
-							t.section = new_number;
-							t.value += fudge_data;
-							delta = true;
-							break;
-						case SECT_KDATA:
-							t.section = new_number;
-							t.value += fudge_kdata;
-							delta = true;
-							break;
-						case SECT_UDATA:
-							t.section = new_number;
-							t.value += fudge_udata;
-							delta = true;
-							break;
+					auto x = remap[t.section];
+					if (x.first != t.section || x.second != 0) {
+						delta = true;
+						t.section = x.first;
+						t.value += x.second;
 					}
 				}
 			}
 			if (delta) simplify_expression(e);
 		}
 	}
-
 
 
 }
@@ -810,6 +831,10 @@ bool one_file(const std::string &name) {
 			break;
 		}
 
+		if (flags._v) {
+			printf("Processing %s:%s\n", name.c_str(), module_name.c_str());
+		}
+
 		// should probably pass in name and module....
 		one_module(record_data, section_data, symbol_data);
 		rv = true;
@@ -839,8 +864,9 @@ int main(int argc, char **argv) {
 
 
 	int c;
-	while ((c = getopt(argc, argv, "CXL:l:o:")) != -1) {
+	while ((c = getopt(argc, argv, "vCXL:l:o:")) != -1) {
 		switch(c) {
+			case 'v': flags._v = true; break;
 			case 'X': _X = true; break;
 			case 'C': _C = true; break;
 			case 'o': _o = optarg; break;
@@ -862,13 +888,14 @@ int main(int argc, char **argv) {
 	init();
 
 	for (int i = 0 ; i < argc; ++i) {
-		one_file(argv[i]);
+		if (!one_file(argv[i])) flags._errors++;
 	}
 
 	//
 	simplify();
 
 	// for each undefined, try to find it in a library...
+	// ... except for the _BEG / _END symbols!
 
 	for (const auto & s : undefined_symbols) {
 		printf("%s\n", s.c_str());
@@ -876,8 +903,26 @@ int main(int argc, char **argv) {
 
 	generate_end();
 
+
+	if (flags._v) {
+		for (auto &s : sections) {
+			//if (s.flags & SEC_REF_ONLY) continue;
+			printf("section %3d %-20s $%04x $%04x\n",
+				s.number, s.name.c_str(), (uint32_t)s.data.size(), s.size);
+		}
+		fputs("\n", stdout);
+	}
+
 	merge_data();
 
+	if (flags._v) {
+		for (auto &s : sections) {
+			//if (s.flags & SEC_REF_ONLY) continue;
+			printf("section %3d %-20s $%04x $%04x\n",
+				s.number, s.name.c_str(), (uint32_t)s.data.size(), s.size);
+		}
+		fputs("\n", stdout);
+	}
 
 
 }
