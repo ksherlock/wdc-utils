@@ -9,6 +9,11 @@
 #include <err.h>
 #include <sysexits.h>
 
+
+#ifndef O_BINARY
+#define O_BINARY 0
+#endif
+
 #pragma pack(push, 1)
 struct omf_header {
 	uint32_t bytecount = 0;
@@ -70,7 +75,7 @@ void save_omf(std::vector<omf::segment> &segments, bool expressload, const std::
 	}
 
 	int fd;
-	fd = open(path.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0666);
+	fd = open(path.c_str(), O_WRONLY | O_CREAT | O_TRUNC | O_BINARY, 0666);
 	if (fd < 0) {
 		err(EX_CANTCREAT, "Unable to open %s", path.c_str());
 	}
