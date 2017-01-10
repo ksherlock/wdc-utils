@@ -83,6 +83,7 @@ bool binary_op(unsigned op, std::vector<expr> &v) {
 				#endif
 			}
 		}
+		// optimization... regardless of where it's located, shifting > 24 bits will result in 0...
 		if (a.tag == OP_LOC && b.tag == OP_VAL) {
 			switch(op) {
 				case OP_ADD: a.value += b.value; return true;

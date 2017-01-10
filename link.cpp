@@ -24,7 +24,7 @@
 
 #include "obj816.h"
 #include "expression.h"
-
+#include "omf.h"
 
 #ifndef O_BINARY
 #define O_BINARY 0
@@ -35,6 +35,9 @@ struct {
 	bool _v = false;
 	bool _C = false;
 	bool _X = false;
+	bool _S = false;
+	std::string _o;
+
 	unsigned _errors = 0;
 } flags;
 
@@ -477,6 +480,7 @@ void one_module(const std::vector<uint8_t> &data, const std::vector<uint8_t> &se
 							assert(!"unsupported expression opcode.");
 					}
 				}
+				sections[current_section].expressions.emplace_back(std::move(e));
 				break;
 			}
 
@@ -566,6 +570,8 @@ void init() {
 
 
 void generate_end() {
+
+/*
 	const std::string names[] = {
 			"_END_PAGE0",
 			"_END_CODE",
@@ -573,156 +579,316 @@ void generate_end() {
 			"_END_DATA"
 			"_END_UDATA"	
 	};
-
+*/
 	for (int i = 0; i < 5; ++i) {
 		symbol s;
 		s.section = i;
 		s.type = S_REL;
 		s.flags = SF_DEF | SF_GBL;
-		s.offset = sections[i].data.size();
+		s.offset = sections[i].size; // data.size() doesn't word w/ ref_only
 
 		symbols[i * 2 + 1] = s;
 	}
 }
 
-void merge_data() {
 
-	// merge data sections -- kdata, data, udata.
-	// merge custom data sections?
+std::vector<omf::segment> omf_segments;
 
-	std::vector<uint8_t> new_data;
-	std::vector<expression> new_expr;
 
-	unsigned new_number = 0;
+template<class T>
+void append(std::vector<T> &to, std::vector<T> &from) {
+	to.insert(to.end(),
+		std::make_move_iterator(from.begin()),
+		std::make_move_iterator(from.end())
+	);
+}
 
-	uint32_t total_data_size = 0;
+
+template<class T>
+void append(std::vector<T> &to, const std::vector<T> &from) {
+	to.insert(to.end(),
+		from.begin(),
+		from.end()
+	);
+}
+
+template<class T>
+void append(std::vector<T> &to, unsigned count, const T& value) {
+	to.insert(to.end(),
+		count,
+		value
+	);
+}
+
+/*
+ * convert a wdc expression to an omf reloc/interseg record.
+ *
+ */
+void to_omf(const expression &e, omf::segment &seg) {
+	if (e.stack.empty()) return; //?
+
+	if (e.stack.size() == 1 && e.stack[0].tag == OP_VAL) {
+		uint32_t value = e.stack[0].value;
+
+		for(int i = 0; i < e.size; ++i, value >>= 8)
+			seg.data[e.offset + i] = value & 0xff;
+		return;
+	}
+
+	if (e.stack.size() == 1 && e.stack[0].tag == OP_LOC) {
+		auto &loc = e.stack[0];
+
+		uint32_t value = loc.value;
+
+		if (loc.section == 0) {
+			warnx("Unable to relocate (invalid segment).");
+			flags._errors++;
+			return;
+		}
+		if (loc.section == seg.segnum) {
+			omf::reloc r;
+			r.size = e.size;
+			r.offset = e.offset;
+			r.value = value;
+
+			// also store value in data
+			for (int i = 0; i < e.size; ++i, value >>= 8)
+				seg.data[e.offset + i] = value & 0xff;
+
+			seg.relocs.emplace_back(r);
+		} else {
+			omf::interseg r;
+			r.size = e.size;
+			r.offset = e.offset;
+			r.segment = loc.section;
+			r.segment_offset = loc.value;
+
+			seg.intersegs.emplace_back(r);
+		}
+		return;
+	}
+
+	if (e.stack.size() == 3
+		&& e.stack[0].tag == OP_LOC
+		&& e.stack[1].tag == OP_VAL
+		&& (e.stack[2].tag == OP_SHL || e.stack[2].tag == OP_SHR)) {
+
+		auto &loc = e.stack[0];
+		auto &shift = e.stack[1];
+		auto &op = e.stack[2];
+
+
+
+		if (shift.value > 24) {
+			warnx("shift %d", shift.value);
+			for(int i = 0; i < e.size; ++i)
+				seg.data[e.offset +i] = 0;
+			return;
+		}
+
+
+		if (loc.section == 0) {
+			warnx("Unable to relocate expression (invalid segment).");
+			flags._errors++;
+			return;
+		}
+
+		uint32_t value = loc.value;
+		uint8_t shift_value = shift.value;
+		if (op.tag == OP_SHR) {
+			value >>= shift_value;
+			shift_value = -shift_value;
+		} else {
+			value <<= shift_value;
+		}
+
+		if (loc.section == seg.segnum) {
+			omf::reloc r;
+			r.size = e.size;
+			r.offset = e.offset;
+			r.value = loc.value;
+			r.shift = shift_value;
+
+			// also store value in data
+			for (int i = 0; i < e.size; ++i, value >>= 8)
+				seg.data[e.offset + i] = value & 0xff;
+
+			seg.relocs.emplace_back(r);
+		} else {
+			omf::interseg r;
+			r.size = e.size;
+			r.offset = e.offset;
+			r.segment = loc.section;
+			r.segment_offset = loc.value;
+			r.shift = shift_value;
+
+			seg.intersegs.emplace_back(r);
+		}
+		return;
+	}
+
+	warnx("Relocation expression too complex.");
+	flags._errors++;
+	return;
+
+}
+
+
+void build_omf_segments() {
+
+
+	std::vector< std::pair<unsigned, uint32_t> > remap;
+
+	remap.resize(sections.size());
+
+
+#if 0
+	if (!flags._X) {
+		// create an expressload segments.
+		// (should verify it's expressable later...)
+		omf::segment seg;
+		seg.segnum = omf_segments.size()+ 1;
+		seg.kind = 0x8001; // dynamic data segment
+		seg.segname = "~ExpressLoad";
+
+		omf_segments.emplace_back(std::move(seg));
+
+	}
+#endif
+
+
+	// if data + code can fit in one bank, merge them
+	// otherwise, merge all data sections and 1 omf segment
+	// per code section.
+
+	// code is next segment...
+	unsigned code_segment = 0;
+	unsigned data_segment = 0;
+	{
+		omf_segments.emplace_back();
+		auto &seg = omf_segments.back();
+
+		code_segment = data_segment = seg.segnum = omf_segments.size();
+		seg.kind = 0x0000; // static code segment.
+
+		auto &s = sections[SECT_CODE];
+
+		remap[s.number] = std::make_pair(code_segment, 0);
+		append(seg.data, s.data);
+		s.data.clear();
+	}
+	
+
 	uint32_t total_code_size = 0;
-	unsigned data_sections = 0;
-	unsigned code_sections = 0;
-
+	uint32_t total_data_size = 0;
 	for (const auto &s : sections) {
 		if (s.flags & SEC_REF_ONLY) continue;
 		if (s.flags & SEC_DATA) {
-			total_data_size += s.data.size();
-			data_sections++;
-		}
-		else {
-			if (s.data.size() > 0xffff) {
-				flags._errors++;
-				warnx("code section %s ($%04x) exceeds bank size.",
-					s.name.c_str(), (uint32_t)s.data.size());
-			}
-			total_code_size += s.data.size();
-			code_sections++;
+			total_data_size += s.size;
+		} else {
+			total_code_size += s.size;
 		}
 	}
 
-	// add in udata...
+	// add in UDATA
 	total_data_size += sections[SECT_UDATA].size;
 
+	if (total_data_size + sections[SECT_CODE].size > 0xffff) {
 
-	if (sections[SECT_CODE].data.size() + total_data_size < 0xffff) {
-		auto &s = sections[SECT_CODE];
-		new_number = SECT_CODE;
-		new_data = std::move(s.data);
-		new_expr = std::move(s.expressions);
-		s.data.clear();
-		s.expressions.clear();
-	} else {
-		new_number = SECT_DATA;
+		omf_segments.emplace_back();
+
+		auto &seg = omf_segments.back();
+		data_segment = seg.segnum = omf_segments.size();
+		seg.kind = 0x0001; // static data segment.
 	}
 
-
-	// new section, offset fudge pair.
-	std::vector< std::pair<unsigned, uint32_t> > remap;
-	remap.reserve(sections.size());
-
-	for (unsigned i = 0; i < sections.size(); ++i)
-		remap.emplace_back(std::make_pair(i, 0));
+	//omf::segment &code_seg = omf_segments[code_segment-1];
+	omf::segment &data_seg = omf_segments[data_segment-1];
 
 
-	if (total_data_size > 0xffff) {
-		warnx("total data ($%04x) exceeds bank size,", total_data_size);
-	}
-
-
-	// merge all code sections?
-	if (total_code_size <= 0xffff && code_sections > 0) {
-
-	}
-
-
+	// KDATA, DATA, UDATA, other segment order.
 	for (auto &s : sections) {
 		if (s.flags & SEC_REF_ONLY) continue;
 		if ((s.flags & SEC_DATA) == 0) continue;
 
-		uint32_t offset = new_data.size();
-		remap[s.number] = std::make_pair(new_number, offset);
-		new_data.insert(new_data.end(), s.data.begin(), s.data.end());
-		new_expr.insert(new_expr.end(), 
-			std::make_move_iterator(s.expressions.begin()),
-			std::make_move_iterator(s.expressions.end())
-		);
+		remap[s.number] = std::make_pair(data_segment, data_seg.data.size());
 
-		// preserve the name and flags.
+		append(data_seg.data, s.data);
 		s.data.clear();
-		s.expressions.clear();
-		s.size = 0;
 	}
 
-	// add in SECT_UDATA
+	// add in UDATA
 	{
 		auto &s = sections[SECT_UDATA];
-		uint32_t offset = new_data.size();
-
-		remap[s.number] = std::make_pair(new_number, offset);
-		// reference only -- no expressions or data.
-		new_data.insert(new_data.end(), s.size, 0);
-
-		s.size = 0;
+		remap[s.number] = std::make_pair(data_segment, data_seg.data.size());
+		append(data_seg.data, s.size, (uint8_t)0);
 	}
 
-	{
-		auto &s = sections[new_number];
-		s.size = new_data.size();
-		s.data = std::move(new_data);
-		s.expressions = std::move(new_expr);
+	// for all other sections, create a new segment.
+	for (auto &s : sections) {
+		if (s.flags & SEC_REF_ONLY) continue;
+		if (s.flags & SEC_DATA) continue;
+		if (s.number == SECT_CODE) continue;
+
+		omf::segment seg;
+		seg.segnum = omf_segments.size() + 1;
+		seg.kind = 0x0000; // static code.
+		seg.data = std::move(s.data);
+		seg.segname = s.name;
+		s.data.clear();
+
+		remap[s.number] = std::make_pair(seg.segnum, 0);
+
+		omf_segments.emplace_back(std::move(seg));
 	}
 
 
+	// add a stack segment at the end
+	if (flags._S) {
+		auto &s = sections[SECT_PAGE0];
 
+		// create stack/dp segment.
+		uint32_t size = s.size;
+		if (size) {
+			// ????
+			size = (size + 255) & ~255;
 
-	// now remap symbols
-	for (auto &s : symbols) {
-		if ((s.type & 0x0f) == S_REL) {
-			auto x = remap[s.section];
-			s.section = x.first;
-			s.offset += x.second;
+			omf::segment seg;
+			seg.segnum = omf_segments.size() + 1;
+			seg.kind = 0x12; // static dp/stack segment.
+			seg.data.resize(size, 0);
+			seg.loadname = "~Stack";
+			omf_segments.emplace_back(std::move(seg));
+
+			// remap SECT_PAGE0...
+			remap[s.number] = std::make_pair(seg.segnum, 0);
+
+		} else {
+			warnx("page0 is 0 sized. Stack/dp segment not created.");
 		}
 	}
 
-	// and expressions...
-
-	// update expressions with new section / offset.
-	for (auto &s : sections) {
+	// now adjust all the expressions, simplify, and convert to reloc records.
+	for (auto &s :sections) {
 		for (auto &e : s.expressions) {
-			bool delta = false;
+
 			for (auto &t : e.stack) {
 				if (t.tag == OP_LOC) {
-					auto x = remap[t.section];
-					if (x.first != t.section || x.second != 0) {
-						delta = true;
-						t.section = x.first;
-						t.value += x.second;
-					}
+					const auto &x = remap[t.section];
+					t.section = x.first;
+					t.value += x.second;
 				}
 			}
-			if (delta) simplify_expression(e);
+			simplify_expression(e);
+			to_omf(e, omf_segments[s.number-1]);
 		}
 	}
 
+	// and we're done...
 
 }
+
+
 
 
 bool one_file(const std::string &name) {
@@ -855,10 +1021,6 @@ void usage() {
 
 int main(int argc, char **argv) {
 
-	std::string _o;
-	bool _C = false;
-	bool _X = false;
-
 	std::vector<std::string> _l;
 	std::vector<std::string> _L;
 
@@ -867,9 +1029,9 @@ int main(int argc, char **argv) {
 	while ((c = getopt(argc, argv, "vCXL:l:o:")) != -1) {
 		switch(c) {
 			case 'v': flags._v = true; break;
-			case 'X': _X = true; break;
-			case 'C': _C = true; break;
-			case 'o': _o = optarg; break;
+			case 'X': flags._X = true; break;
+			case 'C': flags._C = true; break;
+			case 'o': flags._o = optarg; break;
 			case 'l': _l.emplace_back(optarg); break;
 			case 'L': _L.emplace_back(optarg); break;
 			case 'h': help(); break;
@@ -905,7 +1067,7 @@ int main(int argc, char **argv) {
 
 
 	if (flags._v) {
-		for (auto &s : sections) {
+		for (const auto &s : sections) {
 			//if (s.flags & SEC_REF_ONLY) continue;
 			printf("section %3d %-20s $%04x $%04x\n",
 				s.number, s.name.c_str(), (uint32_t)s.data.size(), s.size);
@@ -913,16 +1075,27 @@ int main(int argc, char **argv) {
 		fputs("\n", stdout);
 	}
 
-	merge_data();
+	build_omf_segments();
 
 	if (flags._v) {
-		for (auto &s : sections) {
-			//if (s.flags & SEC_REF_ONLY) continue;
-			printf("section %3d %-20s $%04x $%04x\n",
-				s.number, s.name.c_str(), (uint32_t)s.data.size(), s.size);
+		for (const auto &s : omf_segments) {
+			printf("segment %3d %-20s $%04x\n",
+				s.segnum, s.segname.c_str(), (uint32_t)s.data.size());
+
+			for (auto &r : s.relocs) {
+				printf("  %02x %02x %06x %06x\n",
+					r.size, r.shift, r.offset, r.value);
+			}
+			for (auto &r : s.intersegs) {
+				printf("  %02x %02x %06x %02x %04x %06x\n",
+					r.size, r.shift, r.offset, r.file, r.segment, r.segment_offset);
+			}
 		}
-		fputs("\n", stdout);
 	}
+
+	void save_omf(std::vector<omf::segment> &segments, bool expressload, const std::string &path);
+
+	save_omf(omf_segments, false, "out.omf");
 
 
 }

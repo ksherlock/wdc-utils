@@ -3,7 +3,7 @@ CXXFLAGS = -std=c++14 -g -Wall
 CCFLAGS = -g
 
 DUMP_OBJS = dumpobj.o disassembler.o zrdz_disassembler.o
-LINK_OBJS = link.o expression.o
+LINK_OBJS = link.o expression.o omf.o
 
 #UNAME_S := $(shell uname -s)
 #ifeq ($(UNAME_S),MINGW64_NT-10.0)
@@ -27,6 +27,8 @@ wdclink : $(LINK_OBJS)
 disassembler.o : disassembler.cpp disassembler.h
 zrdz_disassembler.o : zrdz_disassembler.cpp zrdz_disassembler.h disassembler.h
 dumpobj.o : dumpobj.cpp zrdz_disassembler.h disassembler.h
+omf.o : omf.cpp omf.h
+expression.o : expression.cpp expression.h
 mingw/err.o : mingw/err.c mingw/err.h
 
 .PHONY: clean
