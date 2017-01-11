@@ -1093,9 +1093,10 @@ int main(int argc, char **argv) {
 		}
 	}
 
+	if (flags._o.empty()) flags._o = "out.omf";
 	void save_omf(std::vector<omf::segment> &segments, bool expressload, const std::string &path);
 
-	save_omf(omf_segments, false, "out.omf");
+	save_omf(omf_segments, !flags._X, flags._o);
 
 
 }
