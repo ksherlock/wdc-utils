@@ -212,7 +212,7 @@ int set_file_type(const std::string &path, uint16_t file_type, uint32_t aux_type
 		std::string xpath(path);
 		xpath.append(":AFP_AfpInfo");
 
-		int fd = open(path.c_str(), O_RDWR | O_CREAT | O_BINARY, 0666);
+		int fd = open(xpath.c_str(), O_RDWR | O_CREAT | O_BINARY, 0666);
 		if (fd < 0) return -1;
 
 		ok = read(fd, &info, sizeof(info));
