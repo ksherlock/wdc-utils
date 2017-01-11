@@ -39,6 +39,8 @@ struct {
 	std::string _o;
 
 	unsigned _errors = 0;
+	uint16_t _file_type;
+	uint32_t _aux_type;
 } flags;
 
 enum class endian {
@@ -1026,7 +1028,7 @@ int main(int argc, char **argv) {
 
 
 	int c;
-	while ((c = getopt(argc, argv, "vCXL:l:o:")) != -1) {
+	while ((c = getopt(argc, argv, "vCXL:l:o:t:")) != -1) {
 		switch(c) {
 			case 'v': flags._v = true; break;
 			case 'X': flags._X = true; break;
@@ -1035,6 +1037,12 @@ int main(int argc, char **argv) {
 			case 'l': _l.emplace_back(optarg); break;
 			case 'L': _L.emplace_back(optarg); break;
 			case 'h': help(); break;
+			case 't': {
+				// -t xx[:xxxx] -- set file/auxtype.
+				std::string tmp=optarg;
+				break;
+			}
+
 			case ':':
 			case '?':
 			default:
@@ -1094,9 +1102,14 @@ int main(int argc, char **argv) {
 	}
 
 	if (flags._o.empty()) flags._o = "out.omf";
+	if (!flags._file_type) {
+		flags._file_type = 0xb3;
+	}
 	void save_omf(std::vector<omf::segment> &segments, bool expressload, const std::string &path);
+	int set_file_type(const std::string &path, uint16_t file_type, uint32_t aux_type);
 
 	save_omf(omf_segments, !flags._X, flags._o);
+	set_file_type(flags._o, flags._file_type, flags._aux_type);
 
 
 }

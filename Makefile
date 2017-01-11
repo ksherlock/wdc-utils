@@ -3,7 +3,7 @@ CXXFLAGS = -std=c++14 -g -Wall
 CCFLAGS = -g
 
 DUMP_OBJS = dumpobj.o disassembler.o zrdz_disassembler.o
-LINK_OBJS = link.o expression.o omf.o
+LINK_OBJS = link.o expression.o omf.o set_file_type.o
 
 #UNAME_S := $(shell uname -s)
 #ifeq ($(UNAME_S),MINGW64_NT-10.0)
