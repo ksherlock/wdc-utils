@@ -1,5 +1,5 @@
 LINK.o = $(LINK.cc)
-CXXFLAGS = -std=c++14 -g -Wall
+CXXFLAGS = -std=c++14 -g -Wall -Wno-sign-compare
 CCFLAGS = -g
 
 DUMP_OBJS = dumpobj.o disassembler.o zrdz_disassembler.o

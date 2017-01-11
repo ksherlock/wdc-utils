@@ -5,10 +5,11 @@
 #include <unistd.h>
 #include <fcntl.h>
 
+#include <sys/stat.h>
+
 
 #if defined(__APPLE__)
 #include <sys/xattr.h>
-#include <sys/stat.h>
 
 #elif defined(__linux__)
 #include <sys/xattr.h>
@@ -190,22 +191,22 @@ static void afp_init(struct AFP_Info *info, uint16_t file_type, uint32_t aux_typ
 		file_type_to_finder_info(info->finder_info, file_type, aux_type);
 }
 
-static BOOL afp_verify(struct AFP_Info *info) {
-	if (!info) return 0;
+static bool afp_verify(struct AFP_Info *info) {
+	if (!info) return false;
 
-	if (info->magic != 0x00504641) return 0;
-	if (info->version != 0x00010000) return 0;
+	if (info->magic != 0x00504641) return false;
+	if (info->version != 0x00010000) return false;
 
-	return 1;
+	return true;
 }
 
 
-int set_file_type(const std::string &path, uint16_t ftype, uint32_t auxtype) {
+int set_file_type(const std::string &path, uint16_t file_type, uint32_t aux_type) {
 	AFP_Info info;
 	int ok;
 	struct stat st;
 
-	ok = stat(path, &st);
+	ok = stat(path.c_str(), &st);
 	if (ok == 0 && ! S_ISDIR(st.st_mode)) {
 
 		std::string xpath(path);
@@ -215,11 +216,11 @@ int set_file_type(const std::string &path, uint16_t ftype, uint32_t auxtype) {
 		if (fd < 0) return -1;
 
 		ok = read(fd, &info, sizeof(info));
-		if (ok < sizeof(info) || !afp_verify(info)) {
-			afp_init(&info, filetype, auxtype)
+		if (ok < sizeof(info) || !afp_verify(&info)) {
+			afp_init(&info, file_type, aux_type);
 		} else {
-			info.prodos_file_type = filetype;
-			info.prodos_aux_type = auxtype;
+			info.prodos_file_type = file_type;
+			info.prodos_aux_type = aux_type;
 			file_type_to_finder_info(info.finder_info, file_type, aux_type);
 		}
 
@@ -234,7 +235,7 @@ int set_file_type(const std::string &path, uint16_t ftype, uint32_t auxtype) {
 
 #else
 
-int set_file_type(const std::string &path, uint16_t ftype, uint32_t auxtype) {
+int set_file_type(const std::string &path, uint16_t file_type, uint32_t aux_type) {
 
 
 	int fd;
@@ -255,14 +256,14 @@ int set_file_type(const std::string &path, uint16_t ftype, uint32_t auxtype) {
 			return -1;
 		}
 		ok = read(xfd, buffer, 32);
-		file_type_to_finder_info(buffer, ftype, auxtype);
+		file_type_to_finder_info(buffer, file_type, aux_type);
 		lseek(xfd, 0, SEEK_SET);
 		ok = write(xfd, buffer, 32);
 		close(xfd);
 #else
 
 		ok = read_xattr(fd, XATTR_FINDERINFO_NAME, buffer, 32);
-		file_type_to_finder_info(buffer, ftype, auxtype);
+		file_type_to_finder_info(buffer, file_type, aux_type);
 		ok = write_xattr(fd, XATTR_FINDERINFO_NAME, buffer, 32);
 #endif
 	}
