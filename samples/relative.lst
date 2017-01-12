@@ -1,0 +1,50 @@
+  Thu Jan 12 2017 12:24                                                Page 1
+
+
+                     ***************************************
+                     **      WDC 65C816 Macro Assembler   **
+                     **                                   **
+                     **     Version 3.49.1- Feb  6 2006    **
+                     ***************************************
+
+     1                        	; test relative expressions.
+     2                        
+     3                        	module code1
+     4                        	globals on
+     5                        	externs on
+     6                        branchb
+     7 00:0000: EA           	nop
+     8 00:0001: EA           	nop
+     9                        	endmod
+    10                        
+    11                        	module code2
+    12                        	globals on
+    13                        	externs on
+    14 00:0000: 4C xx xx     	jmp branchb
+    15 00:0003: 80 xx        	bra branchb
+    16 00:0005: 82 xx xx     	brl branchb
+    17 00:0008: 62 xx xx     	per branchb
+    18                        	;
+    19 00:000B: EA           	nop
+    20 00:000C: EA           	nop
+    21                        	;
+    22 00:000D: 4C xx xx     	jmp branchf
+    23 00:0010: 80 xx        	bra branchf
+    24 00:0012: 82 xx xx     	brl branchf
+    25 00:0015: 62 xx xx     	per branchf
+    26                        
+    27                        	endmod
+    28                        
+    29                        	module code3
+    30                        	globals on
+    31                        	externs on
+    32                        branchf
+    33 00:0000: EA           	nop
+    34 00:0001: EA           	nop
+    35 00:0002: EA           	nop
+    36 00:0003: 6B           	rtl
+    37                        	endmod
+
+
+      Lines assembled: 37
+      Errors: 0

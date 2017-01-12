@@ -1,0 +1,50 @@
+  Thu Jan 12 2017 12:17                                                Page 1
+
+
+                     ***************************************
+                     **      WDC 65C816 Macro Assembler   **
+                     **                                   **
+                     **     Version 3.49.1- Feb  6 2006    **
+                     ***************************************
+
+     1                        
+     2                        	;
+     3                        	; 2-segment, 2 module code.
+     4                        	; with intersegment linkage.
+     5                        
+     6                        	include 'hello.macros'
+     7                        
+     8                        	macdelim {
+     9                        
+    10                        	module code
+    11                        	CODE
+    12                        	extern text
+    13 00:0000: F4 xx xx     	pea #^text
+    14 00:0003: F4 xx xx     	pea #text
+    15                        	_WriteLine
++   15 00:0006: A2 0C 1A     		ldx #$1a0c
++   15 00:0009: 22 00 00 E1  		jsl $e10000
+    16                        
+    17 00:000D: 6B           	rtl
+    18                        	ends
+    19                        	endmod
+    20                        
+    21                        	module data
+    22                        XDATA	SECTION
+    23                        	public text
+    24                        text
+    25                        	pstr {'hello, world'}
++   25 00:0000: 0C           		db end0001-start0001
++   25                        start0001
++   25 00:0001: 68 65 6C 6C  		db 'hello, world'
+       00:0005: 6F 2C 20 77 
+       00:0009: 6F 72 6C 64 
++   25                        end0001
+    26 00:000D:              	ends
+    27                        	endmod
+    28                        
+    29                        	
+
+
+      Lines assembled: 59
+      Errors: 0
