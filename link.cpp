@@ -11,6 +11,7 @@
 #include <err.h>
 #include <assert.h>
 #include <stdio.h>
+#include <cctype>
 
 #include <string>
 #include <vector>
@@ -1013,6 +1014,73 @@ bool one_file(const std::string &name) {
 	return rv;
 }
 
+#if 0
+bool parse_ft(const std::string &s) {
+	// xx
+	// xx:xxxx or xx,xxxx
+
+	auto lambda = [](const optional<int> &lhs, const uint8_t rhs) {
+			if (!lhs) return lhs;
+			if (rhs >= '0' && rhs <= '9')
+				return optional<int>((*lhs << 4) + rhs);
+			if (rhs >= 'a' && rhs <= 'f')
+				return optional<int>((*lhs << 4) + (rhs - 'a' + 10));
+			if (rhs >= 'A' && rhs <= 'F')
+				return optional<int>((*lhs << 4) + (rhs - 'A') + 10);
+
+			return optional<int>();
+	};
+
+	optional<int> ft;
+	optional<int> at;
+
+	if (s.length() == 2 || s.length() == 7) {
+
+		ft = std::accumulate(s.begin(), s.begin() + 2, optional<int>(0), lambda);
+
+		if (s.length() == 7) {
+			ft = optional<int>();
+			if (s[2] == ':' || s[2] == ',')
+				at = std::accumulate(s.begin() + 3, s.end(), optional<int>(0), lambda);
+		} else at = optional<int>(0);
+	}
+
+	if (at && ft) {
+		flags._file_type = *ft;
+		flags._aux_type = *at;
+		return true;
+	}
+	return false;
+}
+
+#endif
+
+
+bool parse_ft(const std::string &s) {
+
+	if (s.length() != 2 && s.length() != 7) return false;
+	if (!std::all_of(s.begin(), s.begin() + 2, std::isxdigit)) return false;
+	if (s.length() == 7) {
+		if (s[2] != ',' && s[2] != ':') return false;
+		if (!std::all_of(s.begin() + 3, s.end(), std::isxdigit)) return false;
+	}
+
+	auto lambda = [](int lhs, uint8_t rhs){
+		lhs <<= 4;
+		if (rhs <= '9') return lhs + rhs - '0';
+		return lhs + (rhs | 0x20) - 'a' + 10;
+	};
+
+	flags._file_type = std::accumulate(s.begin(), s.begin() + 2, 0, lambda);
+	flags._aux_type = 0;
+
+	if (s.length() == 7)
+		flags._aux_type = std::accumulate(s.begin() + 3, s.end(), 0, lambda);
+
+	return true;
+}
+
+
 void help() {
 	exit(0);
 }
@@ -1039,7 +1107,9 @@ int main(int argc, char **argv) {
 			case 'h': help(); break;
 			case 't': {
 				// -t xx[:xxxx] -- set file/auxtype.
-				std::string tmp=optarg;
+				if (!parse_ft(optarg)) {
+					errx(EX_USAGE, "Invalid -t argument: %s", optarg);
+				}
 				break;
 			}
 

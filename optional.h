@@ -57,6 +57,32 @@ public:
 
 
 
+	template< class U = T > 
+	optional& operator=( U&& value ) {
+		if (_engaged) {
+			auto &self = *reinterpret_cast<T*>(std::addressof(_data));
+			self = std::forward<U>(value);
+		}
+		else {
+			new(std::addressof(_data)) T(std::forward<U>(value));
+			_engaged = true;			
+		}
+		return *this;
+	}
+
+	optional& operator=(optional &&rhs) {
+		if (rhs._engaged) this->operator=(std::forward<T>(*rhs));
+		else reset();
+		return *this;
+	}
+
+	optional& operator=(const optional &rhs) {
+		if (rhs._engaged) this->operator=(*rhs);
+		else reset();
+		return *this;
+	}
+
+
 	~optional() {
 		reset();
 	}
