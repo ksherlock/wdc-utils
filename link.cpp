@@ -1058,11 +1058,13 @@ bool parse_ft(const std::string &s) {
 
 bool parse_ft(const std::string &s) {
 
+	// gcc doesn't like std::xdigit w/ std::all_of
+
 	if (s.length() != 2 && s.length() != 7) return false;
-	if (!std::all_of(s.begin(), s.begin() + 2, std::isxdigit)) return false;
+	if (!std::all_of(s.begin(), s.begin() + 2, isxdigit)) return false;
 	if (s.length() == 7) {
 		if (s[2] != ',' && s[2] != ':') return false;
-		if (!std::all_of(s.begin() + 3, s.end(), std::isxdigit)) return false;
+		if (!std::all_of(s.begin() + 3, s.end(), isxdigit)) return false;
 	}
 
 	auto lambda = [](int lhs, uint8_t rhs){
