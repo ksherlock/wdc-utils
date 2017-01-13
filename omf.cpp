@@ -330,9 +330,9 @@ uint32_t add_relocs(std::vector<uint8_t> &data, size_t data_offset, omf::segment
 		if (tmp.empty()) continue;
 
 		reloc_size += tmp.size() + 6;
-		push(data, omf::SUPER);
+		data.push_back(omf::SUPER);
 		push(data, ((uint32_t)tmp.size() + 1));
-		push(data, (uint8_t)i);
+		data.push_back(i);
 
 		data.insert(data.end(), tmp.begin(), tmp.end());
 	}
