@@ -89,26 +89,15 @@ void push(std::vector<uint8_t> &v, const std::string &s) {
 	v.insert(v.end(), s.begin(), s.end());
 }
 
-class super_reloc {
+class super_helper {
 
 	std::vector<uint8_t> _data;
 	uint32_t _page = 0;
 	int _count = 0;
-	bool _valid = false;
-
 
 public:
 
-	super_reloc(unsigned type) {
-		_valid = true;
-		_data.push_back(omf::SUPER);
-		_data.push_back(0x00);
-		_data.push_back(0x00);
-		_data.push_back(0x00);
-		_data.push_back(0x00);
-		_data.push_back(type);
-	}
-
+	super_helper() = default;
 
 
 	void append(uint32_t pc) {
@@ -118,13 +107,20 @@ public:
 
 		if (page != _page) {
 			unsigned skip = page - _page;
-			if (skip > 1) _data.push_back(0x80 | skip);
+			if (skip > 1) {
+				
+				while (skip >= 0x80) {
+					_data.push_back(0xff);
+					skip -= 0x7f;
+				}
+				if (skip)
+					_data.push_back(0x80 | skip);
+			}
 			_page = page;
 			_count = 0;
 		}
 
 		if (!_count) {
-			_valid = true;
 			_data.push_back(0); // count-1 place holder.
 		} else {
 			_data[_data.size() - _count - 1] = _count; // count is count - 1 at this point,
@@ -134,18 +130,14 @@ public:
 		++_count;
 	}
 
-	std::vector<uint8_t> finish() {
-		if (_valid) {
-			uint32_t size = _data.size() - 5;
-			_data[1] = size & 0xff; size >>= 8;
-			_data[2] = size & 0xff; size >>= 8;
-			_data[3] = size & 0xff; size >>= 8;
-			_data[4] = size & 0xff; size >>= 8;
-		}
-		auto tmp = std::move(_data);
-		_valid = false;
+	void reset() {
 		_data.clear();
-		return tmp;
+		_page = 0;
+		_count = 0;
+	}
+
+	const std::vector<uint8_t> &data() {
+		return _data;
 	}
 
 };
@@ -194,7 +186,7 @@ enum {
 
 uint32_t add_relocs(std::vector<uint8_t> &data, size_t data_offset, omf::segment &seg, bool compress) {
 
-	std::array< optional<super_reloc>, 38 > ss;
+	std::array< optional<super_helper>, 38 > ss;
 
 
 	uint32_t reloc_size = 0;
@@ -203,47 +195,49 @@ uint32_t add_relocs(std::vector<uint8_t> &data, size_t data_offset, omf::segment
 
 		if (r.can_compress()) {
 
-			if (compress && r.shift == 0 && r.size == 2) {
-				constexpr int n = SUPER_RELOC2;
+			if (compress) {
+				if (r.shift == 0 && r.size == 2) {
+					constexpr int n = SUPER_RELOC2;
 
-				auto &sr = ss[n];
-				if (!sr) sr.emplace(n);
+					auto &sr = ss[n];
+					if (!sr) sr.emplace();
 
-				uint32_t value = r.value;
-				sr->append(r.offset);
-				for (int i = 0; i < 2; ++i, value >>= 8)
-					data[data_offset + r.offset + i] = value; 
-				continue;
-			}
+					uint32_t value = r.value;
+					sr->append(r.offset);
+					for (int i = 0; i < 2; ++i, value >>= 8)
+						data[data_offset + r.offset + i] = value; 
+					continue;
+				}
 
-			// sreloc 3 is for 3 bytes.  however 4 bytes is also ok since 
-			// it's 24-bit address space.
-			if (compress && r.shift == 0 && (r.size == 2 || r.size == 3))
-			{
-				constexpr int n = SUPER_RELOC3;
+				// sreloc 3 is for 3 bytes.  however 4 bytes is also ok since 
+				// it's 24-bit address space.
+				if (r.shift == 0 && (r.size == 2 || r.size == 3))
+				{
+					constexpr int n = SUPER_RELOC3;
 
-				auto &sr = ss[n];
-				if (!sr) sr.emplace(n);
+					auto &sr = ss[n];
+					if (!sr) sr.emplace();
 
-				uint32_t value = r.value;
-				sr->append(r.offset);
-				for (int i = 0; i < 3; ++i, value >>= 8)
-					data[data_offset + r.offset + i] = value; 
-				continue;	
-			}
+					uint32_t value = r.value;
+					sr->append(r.offset);
+					for (int i = 0; i < 3; ++i, value >>= 8)
+						data[data_offset + r.offset + i] = value; 
+					continue;	
+				}
 
-			// if size == 2 && shift == -16, -> SUPER INTERSEG 
-			if (compress && seg.segnum <= 12 && r.shift == 0xf0 && r.size == 2) {
+				// if size == 2 && shift == -16, -> SUPER INTERSEG 
+				if (seg.segnum <= 12 && r.shift == 0xf0 && r.size == 2) {
 
-				int n = SUPER_INTERSEG24 + seg.segnum;
-				auto &sr = ss[n];
-				if (!sr) sr.emplace(n);
+					int n = SUPER_INTERSEG24 + seg.segnum;
+					auto &sr = ss[n];
+					if (!sr) sr.emplace();
 
-				uint32_t value = r.value;
-				sr->append(r.offset);
-				for (int i = 0; i < 2; ++i, value >>= 8)
-					data[data_offset + r.offset + i] = value; 
-				continue;
+					uint32_t value = r.value;
+					sr->append(r.offset);
+					for (int i = 0; i < 2; ++i, value >>= 8)
+						data[data_offset + r.offset + i] = value; 
+					continue;
+				}
 			}
 
 			push(data, (uint8_t)omf::cRELOC);
@@ -270,7 +264,7 @@ uint32_t add_relocs(std::vector<uint8_t> &data, size_t data_offset, omf::segment
 				if (r.shift == 0 && r.size == 3) {
 					constexpr int n = SUPER_INTERSEG1;
 					auto &sr = ss[n];
-					if (!sr) sr.emplace(n);
+					if (!sr) sr.emplace();
 
 					uint32_t value = r.segment_offset;
 					data[data_offset + r.offset + 0] = value; value >>= 8;
@@ -284,7 +278,7 @@ uint32_t add_relocs(std::vector<uint8_t> &data, size_t data_offset, omf::segment
 
 					int n = SUPER_INTERSEG12 + r.segment;
 					auto &sr = ss[n];
-					if (!sr) sr.emplace(n);
+					if (!sr) sr.emplace();
 
 					uint32_t value = r.segment_offset;
 					sr->append(r.offset);
@@ -297,7 +291,7 @@ uint32_t add_relocs(std::vector<uint8_t> &data, size_t data_offset, omf::segment
 
 					int n = SUPER_INTERSEG24 + r.segment;
 					auto &sr = ss[n];
-					if (!sr) sr.emplace(n);
+					if (!sr) sr.emplace();
 
 					uint32_t value = r.segment_offset;
 					sr->append(r.offset);
@@ -328,17 +322,25 @@ uint32_t add_relocs(std::vector<uint8_t> &data, size_t data_offset, omf::segment
 	}
 
 
-	for (auto &s : ss) {
+	for (int i = 0; i < ss.size(); ++i) {
+		auto &s = ss[i];
 		if (!s) continue;
-		auto tmp = s->finish();
-		reloc_size += tmp.size();
+
+		auto tmp = s->data();
+		if (tmp.empty()) continue;
+
+		reloc_size += tmp.size() + 6;
+		push(data, omf::SUPER);
+		push(data, ((uint32_t)tmp.size() + 1));
+		push(data, (uint8_t)i);
+
 		data.insert(data.end(), tmp.begin(), tmp.end());
 	}
 
 	return reloc_size;
 }
 
-void save_omf(std::vector<omf::segment> &segments, bool expressload, const std::string &path) {
+void save_omf(const std::string &path, std::vector<omf::segment> &segments, bool compress, bool expressload) {
 
 	// expressload doesn't support links to other files. 
 	// fortunately, we don't either.
@@ -400,12 +402,17 @@ void save_omf(std::vector<omf::segment> &segments, bool expressload, const std::
 		//lconst record
 		push(data, (uint8_t)omf::LCONST);
 		push(data, (uint32_t)h.length);
+
+		size_t data_offset = data.size();
+
 		data.insert(data.end(), s.data.begin(), s.data.end());
 
 
 		uint32_t reloc_offset = offset + sizeof(omf_header) + data.size();
 		uint32_t reloc_size = 0;
 
+		reloc_size = add_relocs(data, data_offset, s, compress);
+#if 0
 		// should interseg/reloc records be sorted?
 		// todo -- compress into super records.
 		for (const auto &r : s.relocs) {
@@ -446,10 +453,10 @@ void save_omf(std::vector<omf::segment> &segments, bool expressload, const std::
 				reloc_size += 15;
 			}
 		}
-
+#endif
 
 		// end-of-record
-		push(data, (uint8_t)0x00);
+		push(data, (uint8_t)omf::END);
 
 		h.bytecount = data.size() + sizeof(omf_header);
 

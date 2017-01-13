@@ -1225,12 +1225,11 @@ int main(int argc, char **argv) {
 	if (!flags._file_type) {
 		flags._file_type = 0xb3;
 	}
-	void save_omf(std::vector<omf::segment> &segments, bool expressload, const std::string &path);
+
+	void save_omf(const std::string &path, std::vector<omf::segment> &segments, bool compress, bool expressload);
 	int set_file_type(const std::string &path, uint16_t file_type, uint32_t aux_type);
 
-	save_omf(omf_segments, !flags._X, flags._o);
+	save_omf(flags._o, omf_segments, !flags._C, !flags._X);
 	set_file_type(flags._o, flags._file_type, flags._aux_type);
-
-
 }
 
