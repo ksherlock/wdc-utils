@@ -56,6 +56,10 @@ public:
 	}
 
 
+	~optional() {
+		reset();
+	}
+
 
 	template< class U = T > 
 	optional& operator=( U&& value ) {
@@ -82,9 +86,11 @@ public:
 		return *this;
 	}
 
-
-	~optional() {
+	template< class... Args > 
+	void emplace( Args&&... args ) {
 		reset();
+		new(std::addressof(_data)) T(std::forward<Args>(args)...);
+		_engaged = true;		
 	}
 
 
