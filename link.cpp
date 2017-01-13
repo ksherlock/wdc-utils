@@ -633,9 +633,14 @@ inline bool in_range(int value, int low, int high) {
 	return value >= low && value <= high;
 }
 
+inline void expr_error(bool fatal, const expression &e, const char *msg) {
+	if (fatal) flags._errors++;
+	warnx("%s:%04x %s", sections[e.section].name.c_str(), e.offset, msg);
+}
+
 void to_omf(const expression &e, omf::segment &seg) {
 	if (e.stack.empty() || e.size == 0) {
-		warnx("Expression empty at segment \"%s\" pc %04x", seg.segname.c_str(), e.offset);
+		expr_error(false, e, "Expression empty");
 		return;
 	}
 
@@ -655,9 +660,7 @@ void to_omf(const expression &e, omf::segment &seg) {
 				if (e.size == 1 && in_range(tmp, -128, 127)) ok = true;
 
 				if (!ok) {
-					warnx("Relative branch out of range (%d) at segment \"%s\" pc %04x",
-						tmp, seg.segname.c_str(), e.offset);
-					flags._errors++;
+					expr_error(true, e, "Relative branch out of range");
 					return;					
 				}
 
@@ -667,8 +670,7 @@ void to_omf(const expression &e, omf::segment &seg) {
 				return;
 			}
 
-			warnx("Relative branch error at \"%s\" pc %04x", seg.segname.c_str(), e.offset);
-			flags._errors++;
+			expr_error(true, e, "Relative expression too complex");
 			return;
 		}
 
@@ -681,9 +683,9 @@ void to_omf(const expression &e, omf::segment &seg) {
 
 		if (a.tag == OP_LOC) {
 			auto &loc = a;
+
 			if (loc.section == 0) {
-				warnx("Invalid segment at \"%s\" pc %04x", seg.segname.c_str(), e.offset);
-				flags._errors++;
+				expr_error(true, e, "Invalid segment");
 				return;
 			}
 
@@ -731,14 +733,13 @@ void to_omf(const expression &e, omf::segment &seg) {
 
 
 			if (shift.value > 24) {
-				warnx("Shift %d at \"%s\" pc %04x", shift.value, seg.segname.c_str(), e.offset);
+				expr_error(false, e, "Shift too large");
 				// data is already pre-zeroed.
 				return;
 			}
 
 			if (loc.section == 0) {
-				warnx("Invalid segment at \"%s\" pc %04x", seg.segname.c_str(), e.offset);
-				flags._errors++;
+				expr_error(true, e, "Invalid segment");
 				return;
 			}
 
@@ -779,9 +780,9 @@ void to_omf(const expression &e, omf::segment &seg) {
 		}
 	}
 
-	warnx("Expression too complex at \"%s\" pc %04x", seg.segname.c_str(), e.offset);
+
+	expr_error(true, e, "Expression too complex");
 	// should also pretty-print the expression.
-	flags._errors++;
 	return;
 
 }
