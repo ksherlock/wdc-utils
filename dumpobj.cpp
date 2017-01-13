@@ -16,6 +16,8 @@
 #include "obj816.h"
 #include "zrdz_disassembler.h"
 
+#include "endian.h"
+
 #ifndef O_BINARY
 #define O_BINARY 0
 #endif
@@ -33,12 +35,6 @@ struct {
 	bool _n = false;
 } flags;
 
-
-enum class endian {
-	little = __ORDER_LITTLE_ENDIAN__,
-	big = __ORDER_BIG_ENDIAN__,
-	native = __BYTE_ORDER__
-};
 
 
 template<class T>

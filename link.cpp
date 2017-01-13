@@ -27,6 +27,8 @@
 #include "expression.h"
 #include "omf.h"
 
+#include "endian.h"
+
 #ifndef O_BINARY
 #define O_BINARY 0
 #endif
@@ -44,11 +46,6 @@ struct {
 	uint32_t _aux_type;
 } flags;
 
-enum class endian {
-	little = __ORDER_LITTLE_ENDIAN__,
-	big = __ORDER_BIG_ENDIAN__,
-	native = __BYTE_ORDER__
-};
 
 
 template<class T>
