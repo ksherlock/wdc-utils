@@ -407,6 +407,7 @@ void one_module(const std::vector<uint8_t> &data, const std::vector<uint8_t> &se
 
 				expression e;
 				e.relative = op == REC_RELEXP;
+				e.section = current_section;
 
 				e.offset =  data_ptr->size();
 				e.size = read_8(iter);
@@ -627,110 +628,159 @@ void append(std::vector<T> &to, unsigned count, const T& value) {
  * convert a wdc expression to an omf reloc/interseg record.
  *
  */
+
+inline bool in_range(int value, int low, int high) {
+	return value >= low && value <= high;
+}
+
 void to_omf(const expression &e, omf::segment &seg) {
-	if (e.stack.empty()) return; //?
-
-	if (e.stack.size() == 1 && e.stack[0].tag == OP_VAL) {
-		uint32_t value = e.stack[0].value;
-
-		for(int i = 0; i < e.size; ++i, value >>= 8)
-			seg.data[e.offset + i] = value & 0xff;
+	if (e.stack.empty() || e.size == 0) {
+		warnx("Expression empty at segment \"%s\" pc %04x", seg.segname.c_str(), e.offset);
 		return;
 	}
 
-	if (e.stack.size() == 1 && e.stack[0].tag == OP_LOC) {
-		auto &loc = e.stack[0];
 
-		uint32_t value = loc.value;
+	if (e.stack.size() == 1) {
+		auto &a = e.stack[0];
 
-		if (loc.section == 0) {
-			warnx("Unable to relocate (invalid segment).");
+		uint32_t value = a.value;
+
+		if (e.relative) {
+			if (a.tag == OP_VAL || a.tag == OP_LOC) {
+
+				int tmp = (int)value - (int)e.offset - (int)e.size;
+				bool ok = false;
+
+				if (e.size >= 2 && in_range(tmp, -32768, 32767)) ok = true;
+				if (e.size == 1 && in_range(tmp, -128, 127)) ok = true;
+
+				if (!ok) {
+					warnx("Relative branch out of range (%d) at segment \"%s\" pc %04x",
+						tmp, seg.segname.c_str(), e.offset);
+					flags._errors++;
+					return;					
+				}
+
+				for (int i = 0; i < e.size; ++i, tmp >>= 8)
+					seg.data[e.offset + i] = tmp & 0xff;
+
+				return;
+			}
+
+			warnx("Relative branch error at \"%s\" pc %04x", seg.segname.c_str(), e.offset);
 			flags._errors++;
 			return;
 		}
-		if (loc.section == seg.segnum) {
-			omf::reloc r;
-			r.size = e.size;
-			r.offset = e.offset;
-			r.value = value;
 
-			// also store value in data
+
+		if (a.tag == OP_VAL) {
 			for (int i = 0; i < e.size; ++i, value >>= 8)
 				seg.data[e.offset + i] = value & 0xff;
-
-			seg.relocs.emplace_back(r);
-		} else {
-			omf::interseg r;
-			r.size = e.size;
-			r.offset = e.offset;
-			r.segment = loc.section;
-			r.segment_offset = loc.value;
-
-			seg.intersegs.emplace_back(r);
+			return;
 		}
-		return;
+
+		if (a.tag == OP_LOC) {
+			auto &loc = a;
+			if (loc.section == 0) {
+				warnx("Invalid segment at \"%s\" pc %04x", seg.segname.c_str(), e.offset);
+				flags._errors++;
+				return;
+			}
+
+			if (loc.section == seg.segnum) {
+				omf::reloc r;
+				r.size = e.size;
+				r.offset = e.offset;
+				r.value = value;
+
+
+				#if 0
+				// handle later.
+				// if generating a super, store inline.
+				if (!flags._C && r.can_compress()) {
+					for (int i = 0; i < e.size; ++i, value >>= 8)
+						seg.data[e.offset + i] = value & 0xff;
+				}
+				#endif
+				seg.relocs.emplace_back(r);
+			} else {
+				omf::interseg r;
+				r.size = e.size;
+				r.offset = e.offset;
+				r.segment = loc.section;
+				r.segment_offset = loc.value;
+
+				seg.intersegs.emplace_back(r);
+
+				// if generating super, store 
+			}
+			return;
+		}
+
+		// error handled below.
 	}
 
-	if (e.stack.size() == 3
-		&& e.stack[0].tag == OP_LOC
-		&& e.stack[1].tag == OP_VAL
-		&& (e.stack[2].tag == OP_SHL || e.stack[2].tag == OP_SHR)) {
 
+
+	if (e.stack.size() == 3) {
 		auto &loc = e.stack[0];
 		auto &shift = e.stack[1];
 		auto &op = e.stack[2];
 
+		if (loc.tag == OP_LOC && shift.tag == OP_VAL && (op.tag == OP_SHL || op.tag == OP_SHR)) {
 
 
-		if (shift.value > 24) {
-			warnx("shift %d", shift.value);
-			for(int i = 0; i < e.size; ++i)
-				seg.data[e.offset +i] = 0;
+			if (shift.value > 24) {
+				warnx("Shift %d at \"%s\" pc %04x", shift.value, seg.segname.c_str(), e.offset);
+				// data is already pre-zeroed.
+				return;
+			}
+
+			if (loc.section == 0) {
+				warnx("Invalid segment at \"%s\" pc %04x", seg.segname.c_str(), e.offset);
+				flags._errors++;
+				return;
+			}
+
+			uint32_t value = loc.value;
+			uint8_t shift_value = shift.value;
+			if (op.tag == OP_SHR) {
+				value >>= shift_value;
+				shift_value = -shift_value;
+			} else {
+				value <<= shift_value;
+			}
+
+			if (loc.section == seg.segnum) {
+				omf::reloc r;
+				r.size = e.size;
+				r.offset = e.offset;
+				r.value = loc.value;
+				r.shift = shift_value;
+
+				#if 0
+				// also store value in data
+				for (int i = 0; i < e.size; ++i, value >>= 8)
+					seg.data[e.offset + i] = value & 0xff;
+				#endif
+
+				seg.relocs.emplace_back(r);
+			} else {
+				omf::interseg r;
+				r.size = e.size;
+				r.offset = e.offset;
+				r.segment = loc.section;
+				r.segment_offset = loc.value;
+				r.shift = shift_value;
+
+				seg.intersegs.emplace_back(r);
+			}
 			return;
 		}
-
-
-		if (loc.section == 0) {
-			warnx("Unable to relocate expression (invalid segment).");
-			flags._errors++;
-			return;
-		}
-
-		uint32_t value = loc.value;
-		uint8_t shift_value = shift.value;
-		if (op.tag == OP_SHR) {
-			value >>= shift_value;
-			shift_value = -shift_value;
-		} else {
-			value <<= shift_value;
-		}
-
-		if (loc.section == seg.segnum) {
-			omf::reloc r;
-			r.size = e.size;
-			r.offset = e.offset;
-			r.value = loc.value;
-			r.shift = shift_value;
-
-			// also store value in data
-			for (int i = 0; i < e.size; ++i, value >>= 8)
-				seg.data[e.offset + i] = value & 0xff;
-
-			seg.relocs.emplace_back(r);
-		} else {
-			omf::interseg r;
-			r.size = e.size;
-			r.offset = e.offset;
-			r.segment = loc.section;
-			r.segment_offset = loc.value;
-			r.shift = shift_value;
-
-			seg.intersegs.emplace_back(r);
-		}
-		return;
 	}
 
-	warnx("Relocation expression too complex.");
+	warnx("Expression too complex at \"%s\" pc %04x", seg.segname.c_str(), e.offset);
+	// should also pretty-print the expression.
 	flags._errors++;
 	return;
 
