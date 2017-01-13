@@ -8,7 +8,7 @@
 #include <fcntl.h>
 #include <err.h>
 #include <sysexits.h>
-
+#include <assert.h>
 
 #ifndef O_BINARY
 #define O_BINARY 0
@@ -86,6 +86,67 @@ void push(std::vector<uint8_t> &v, const std::string &s) {
 	v.insert(v.end(), s.begin(), s.end());
 }
 
+class super_reloc {
+
+	std::vector<uint8_t> _data;
+	uint32_t _page = 0;
+	int _count = 0;
+
+	super_reloc(unsigned type) {
+		_data.push_back(0xf7);
+		_data.push_back(0x00);
+		_data.push_back(0x00);
+		_data.push_back(0x00);
+		_data.push_back(0x00);
+		_data.push_back(type);
+	}
+
+	void append(uint32_t pc) {
+		unsigned offset = pc & 0xff;
+		unsigned page = pc >> 8;
+		assert(page >= _page);
+
+		if (page != _page) {
+			unsigned skip = page - _page;
+			if (skip > 1) _data.push_back(0x80 | skip);
+			_page = page;
+			_count = 0;
+			_data.push_back(0); // count-1 place holder.
+		}
+
+		_data[_data.size() - _count - 1] = _count; // count is count - 1 at this point,
+		_data.push_back(offset);
+		++_count;
+	}
+
+	std::vector<uint8_t> &&finish() {
+		uint32_t size = _data.size() - 5;
+		_data[1] = size & 0xff; size >>= 8;
+		_data[2] = size & 0xff; size >>= 8;
+		_data[3] = size & 0xff; size >>= 8;
+		_data[4] = size & 0xff; size >>= 8;
+
+		return std::move(_data);
+	}
+
+};
+
+#if 0
+compress() {
+
+
+	for(auto &r : s.reloc) {
+		// super reloc 2 -- size = 2, shift = 0
+		// super reloc 2 -- size = 3, shift = 0
+
+		if (r.size == 2 && r.shift == 0) {
+
+		}
+
+	}
+
+}
+#endif
 
 void save_omf(std::vector<omf::segment> &segments, bool expressload, const std::string &path) {
 
