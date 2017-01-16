@@ -279,8 +279,6 @@ void one_module(const std::vector<uint8_t> &data,
 
 	std::array<int, 256> remap_section;
 
-	int current_section = SECT_CODE;
-	std::vector<uint8_t> *data_ptr = &sections[current_section].data;
 
 	std::fill(remap_section.begin(), remap_section.end(), -1);
 	remap_section[SECT_PAGE0] = SECT_PAGE0;
@@ -292,22 +290,29 @@ void one_module(const std::vector<uint8_t> &data,
 	std::vector<section> local_sections = read_sections(section_data);
 	std::vector<symbol> local_symbols = read_symbols(symbol_data);
 
+
+
 	// convert local sections to global 
 	for (auto &s : local_sections) {
+		//printf("section %20s %d\n", s.name.c_str(), s.number);
+
 		if (s.number <= SECT_UDATA) {
 			sections[s.number].size += s.size; // for page0 / udata sections.
 			continue;
 		}
 
+
 		// todo -- should install section name as global symbol?
 
 		auto iter = section_map.find(s.name);
 		if (iter == section_map.end()) {
+
 			int virtual_section = sections.size();
 			remap_section[s.number] = virtual_section;
 			s.number = virtual_section;
 			sections.emplace_back(s);
-			symbol_map.emplace(s.name, virtual_section);
+			section_map.emplace(s.name, virtual_section);
+
 		} else {
 			auto &ss = sections[iter->second];
 			assert(ss.flags == s.flags); // check org????
@@ -319,8 +324,19 @@ void one_module(const std::vector<uint8_t> &data,
 		}
 	}
 
+
+
 	// convert local symbols to global.
 	for (auto &s : local_symbols) {
+
+		if (flags._v) {
+			const char *status = "";
+			if (s.type == S_UND) status = "extern";
+			else if (s.flags & SF_GBL) status = "public";
+			else status = "private";
+			fprintf(stderr, "  %-20s [%s]\n", s.name.c_str(), status);
+		}
+
 		if (s.type == S_UND) {
 
 
@@ -328,12 +344,17 @@ void one_module(const std::vector<uint8_t> &data,
 			if (iter == symbol_map.end()) {
 				s.section = symbols.size();
 				symbol_map.emplace(s.name, s.section);
+				symbols.emplace_back(s);
 				undefined_symbols.emplace(s.name);
+
+				fprintf(stderr, "Adding %s to undefined symbols\n", s.name.c_str());
 			}
 			else {
 				// already exists... 
 				const auto &ss = symbols[iter->second];
-				if (ss.type != S_UND) s = ss;
+				/* if (ss.type != S_UND) */
+				// always copy over since s.section is a big deal.
+				s = ss;
 			}
 
 			if (local_undefined) {
@@ -352,9 +373,10 @@ void one_module(const std::vector<uint8_t> &data,
 			s.section = -1;
 		}
 
+
+
 		constexpr const unsigned mask = SF_GBL | SF_DEF;
 		if ((s.flags & mask) == mask) {
-
 
 			auto iter = symbol_map.find(s.name);
 
@@ -382,6 +404,10 @@ void one_module(const std::vector<uint8_t> &data,
 		}
 
 	}
+
+	// set it here. sections may be resized above.
+	int current_section = SECT_CODE;
+	std::vector<uint8_t> *data_ptr = &sections[current_section].data;
 
 
 	auto iter = data.begin();
@@ -451,6 +477,7 @@ void one_module(const std::vector<uint8_t> &data,
 									e.stack.emplace_back(OP_SYM, 0, s.section); /* section is actually a symbol number */
 									e.undefined = true;
 									break;
+
 								case S_REL:
 									e.stack.emplace_back(OP_LOC, s.offset, s.section);
 									break;
@@ -583,6 +610,7 @@ void init() {
 
 		symbol_map.emplace(s.name, i * 2 + 1);
 		symbols.emplace_back(s);
+
 
 	}
 
@@ -1192,6 +1220,7 @@ bool intersection(const std::map<std::string, uint32_t> &a,
 
 	while (a_iter != a.end() && b_iter != b.end()) {
 
+		//fprintf(stderr, "comparing %s - %s\n", a_iter->first.c_str(), b_iter->c_str());
 		int cmp = strcmp(a_iter->first.c_str(), b_iter->c_str());
 		if (cmp < 0) a_iter++;
 		else if (cmp > 0) b_iter++;
@@ -1252,7 +1281,7 @@ bool one_lib(const std::string &path) {
 	// read the symbol dictionary.
 
 	std::vector<uint8_t> data;
-	data.reserve(h.l_modstart - sizeof(h));
+	data.resize(h.l_modstart - sizeof(h));
 	ok = read(fd, data.data(), data.size());
 	if (ok != data.size()) {
 		warnx("Invalid library file: %s", path.c_str());
@@ -1268,8 +1297,9 @@ bool one_lib(const std::string &path) {
 
 		// fileno, pstring file name
 		uint16_t fileno = read_16(iter);
-		uint8_t size = read_8(iter);
-		iter += size; // don't care about the name.
+		std::string s = read_pstring(iter);
+		//uint8_t size = read_8(iter);
+		//iter += size; // don't care about the name.
 	}
 
 	std::map<std::string, uint32_t> lib_symbol_map;
@@ -1337,7 +1367,8 @@ void libraries() {
 
 	for (auto &l : flags._l) {
 		for (auto &L : flags._L) {
-			std::string path = L + "lib" + l;
+			//std::string path = L + "lib" + l;
+			std::string path = L + l + ".lib";
 
 			if (one_lib(path)) break;
 		}
@@ -1481,6 +1512,14 @@ int main(int argc, char **argv) {
 
 	if (!undefined_symbols.empty()) libraries();
 	//
+
+	if (!undefined_symbols.empty()) {
+
+		fprintf(stderr, "Unable to resolve the following symbols:\n");
+		for (auto &s : undefined_symbols) fprintf(stderr, "%s\n", s.c_str());
+
+		exit(EX_DATAERR);
+	}
 
 	generate_end();
 	simplify();
