@@ -576,7 +576,7 @@ void dump_lib(const char *name, int fd)
 	std::vector<uint8_t> data;
 	long count = h.l_modstart - sizeof(h);
 	if (count < 0) errx(EX_DATAERR, "%s", name);
-	data.reserve(count);
+	data.resize(count);
 	ok = read(fd, data.data(), count);
 	if (ok != count) errx(EX_DATAERR, "%s truncated", name);
 
