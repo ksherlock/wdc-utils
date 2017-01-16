@@ -2,6 +2,9 @@
 #include <vector>
 #include "obj816.h"
 
+#include <sysexits.h>
+#include <err.h>
+
 /* a ** b */
 uint32_t power(uint32_t a, uint32_t b) {
 
@@ -21,6 +24,8 @@ bool unary_op(unsigned op, std::vector<expr> &v) {
 			case OP_NOT: a.value = !a.value; break;
 			case OP_NEG: a.value = -a.value; break;
 			case OP_FLP: a.value = ~a.value; break;
+			default:
+				errx(EX_SOFTWARE, "Unsupported unary op %02x", a.tag);
 			}
 			return true;
 		}
@@ -54,6 +59,8 @@ bool binary_op(unsigned op, std::vector<expr> &v) {
 			case OP_LT: value = (int32_t)a.value < (int32_t)b.value; break;
 			case OP_UGT: value = a.value > b.value; break;
 			case OP_ULT: value = a.value < b.value; break;
+			default:
+				errx(EX_SOFTWARE, "Unsupported binary op %02x", a.tag);
 			}
 			v.pop_back();
 			v.back().value = value;
@@ -86,8 +93,16 @@ bool binary_op(unsigned op, std::vector<expr> &v) {
 		// optimization... regardless of where it's located, shifting > 24 bits will result in 0...
 		if (a.tag == OP_LOC && b.tag == OP_VAL) {
 			switch(op) {
-				case OP_ADD: a.value += b.value; return true;
-				case OP_SUB: a.value -= b.value; return true;
+				case OP_ADD: {
+					a.value += b.value;
+					v.pop_back();
+					return true;
+				}
+				case OP_SUB: {
+					a.value -= b.value;
+					v.pop_back();
+					return true;
+				}
 			}
 		}
 
