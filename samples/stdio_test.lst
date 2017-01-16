@@ -1,0 +1,347 @@
+  Mon Jan 16 2017 11:21                                                Page 1
+
+
+                     ***************************************
+                     **      WDC 65C816 Macro Assembler   **
+                     **                                   **
+                     **     Version 3.49.1- Feb  6 2006    **
+                     ***************************************
+
+     1                        ;:ts=8
+     2             00000001   R0	equ	1
+     3             00000005   R1	equ	5
+     4             00000009   R2	equ	9
+     5             0000000D   R3	equ	13
+     6                        ;#include <stdio.h>
+     7                        ;#include <fcntl.h>
+     8                        ;
+     9                        ;
+    10                        ;void main(void) {
+    11                        	code
+    12                        	xdef	~~main
+    13                        	func
+    14                        ~~main:
+    15                        	longa	on
+    16                        	longi	on
+    17 00:0000: 3B           	tsc
+    18 00:0001: 38           	sec
+    19 00:0002: E9 04 00     	sbc	#L2
+    20 00:0005: 1B           	tcs
+    21 00:0006: 0B           	phd
+    22 00:0007: 5B           	tcd
+    23                        ;	
+    24                        ;	FILE *fp = fopen("file.txt", "wb");
+    25                        ;
+    26                        ;	fclose(fp);
+    27             00000000   fp_1	set	0
+    28 00:0008: F4 xx xx     	pea	#^L1+9
+    29 00:000B: F4 xx xx     	pea	#<L1+9
+    30 00:000E: F4 xx xx     	pea	#^L1
+    31 00:0011: F4 xx xx     	pea	#<L1
+    32 00:0014: 22 xx xx xx  	jsl	~~fopen
+    33 00:0018: 85 01        	sta	<L3+fp_1
+    34 00:001A: 86 03        	stx	<L3+fp_1+2
+    35 00:001C: D4 03        	pei	<L3+fp_1+2
+    36 00:001E: D4 01        	pei	<L3+fp_1
+    37 00:0020: 22 xx xx xx  	jsl	~~fclose
+    38                        ;}
+    39                        L4:
+    40 00:0024: 2B           	pld
+    41 00:0025: 3B           	tsc
+    42 00:0026: 18           	clc
+    43 00:0027: 69 04 00     	adc	#L2
+    44 00:002A: 1B           	tcs
+    45 00:002B: 6B           	rtl
+    46             00000004   L2	equ	4
+    47             00000001   L3	equ	1
+    48                        	ends
+    49                        	efunc
+    50                        	data
+    51                        L1:
+    52 00:0000: 66 69 6C 65  	db	$66,$69,$6C,$65,$2E,$74,$78,$74,$00,$77,
+  Mon Jan 16 2017 11:21                                                Page 2
+
+
+                    $62,$00
+       00:0004: 2E 74 78 74 
+       00:0008: 00 77 62 00 
+    53 00:000C:              	ends
+    54                        ;
+    55                        ;// these stubs are not provided in the library bu
+                    t could call gs/os.
+    56                        ;
+    57                        ;int open(const char *name, int mode) {
+    58                        	code
+    59                        	xdef	~~open
+    60                        	func
+    61                        ~~open:
+    62                        	longa	on
+    63                        	longi	on
+    64 00:002C: 3B           	tsc
+    65 00:002D: 38           	sec
+    66 00:002E: E9 00 00     	sbc	#L6
+    67 00:0031: 1B           	tcs
+    68 00:0032: 0B           	phd
+    69 00:0033: 5B           	tcd
+    70             00000004   name_0	set	4
+    71             00000008   mode_0	set	8
+    72                        ;	return -1;
+    73 00:0034: A9 FF FF     	lda	#$ffff
+    74                        L8:
+    75 00:0037: A8           	tay
+    76 00:0038: A5 02        	lda	<L6+2
+    77 00:003A: 85 08        	sta	<L6+2+6
+    78 00:003C: A5 01        	lda	<L6+1
+    79 00:003E: 85 07        	sta	<L6+1+6
+    80 00:0040: 2B           	pld
+    81 00:0041: 3B           	tsc
+    82 00:0042: 18           	clc
+    83 00:0043: 69 06 00     	adc	#L6+6
+    84 00:0046: 1B           	tcs
+    85 00:0047: 98           	tya
+    86 00:0048: 6B           	rtl
+    87                        ;}
+    88             00000000   L6	equ	0
+    89             00000001   L7	equ	1
+    90                        	ends
+    91                        	efunc
+    92                        ;
+    93                        ;int close(int fd) {
+    94                        	code
+    95                        	xdef	~~close
+    96                        	func
+    97                        ~~close:
+    98                        	longa	on
+    99                        	longi	on
+   100 00:0049: 3B           	tsc
+   101 00:004A: 38           	sec
+   102 00:004B: E9 00 00     	sbc	#L9
+   103 00:004E: 1B           	tcs
+   104 00:004F: 0B           	phd
+   105 00:0050: 5B           	tcd
+   106             00000004   fd_0	set	4
+  Mon Jan 16 2017 11:21                                                Page 3
+
+
+   107                        ;	return -1;
+   108 00:0051: A9 FF FF     	lda	#$ffff
+   109                        L11:
+   110 00:0054: A8           	tay
+   111 00:0055: A5 02        	lda	<L9+2
+   112 00:0057: 85 04        	sta	<L9+2+2
+   113 00:0059: A5 01        	lda	<L9+1
+   114 00:005B: 85 03        	sta	<L9+1+2
+   115 00:005D: 2B           	pld
+   116 00:005E: 3B           	tsc
+   117 00:005F: 18           	clc
+   118 00:0060: 69 02 00     	adc	#L9+2
+   119 00:0063: 1B           	tcs
+   120 00:0064: 98           	tya
+   121 00:0065: 6B           	rtl
+   122                        ;}
+   123             00000000   L9	equ	0
+   124             00000001   L10	equ	1
+   125                        	ends
+   126                        	efunc
+   127                        ;
+   128                        ;size_t read(int fd, void *buffer, size_t count) {
+   129                        	code
+   130                        	xdef	~~read
+   131                        	func
+   132                        ~~read:
+   133                        	longa	on
+   134                        	longi	on
+   135 00:0066: 3B           	tsc
+   136 00:0067: 38           	sec
+   137 00:0068: E9 00 00     	sbc	#L12
+   138 00:006B: 1B           	tcs
+   139 00:006C: 0B           	phd
+   140 00:006D: 5B           	tcd
+   141             00000004   fd_0	set	4
+   142             00000006   buffer_0	set	6
+   143             0000000A   count_0	set	10
+   144                        ;	return -1;
+   145 00:006E: A9 FF FF     	lda	#$ffff
+   146                        L14:
+   147 00:0071: A8           	tay
+   148 00:0072: A5 02        	lda	<L12+2
+   149 00:0074: 85 0A        	sta	<L12+2+8
+   150 00:0076: A5 01        	lda	<L12+1
+   151 00:0078: 85 09        	sta	<L12+1+8
+   152 00:007A: 2B           	pld
+   153 00:007B: 3B           	tsc
+   154 00:007C: 18           	clc
+   155 00:007D: 69 08 00     	adc	#L12+8
+   156 00:0080: 1B           	tcs
+   157 00:0081: 98           	tya
+   158 00:0082: 6B           	rtl
+   159                        ;}
+   160             00000000   L12	equ	0
+   161             00000001   L13	equ	1
+   162                        	ends
+   163                        	efunc
+   164                        ;
+  Mon Jan 16 2017 11:21                                                Page 4
+
+
+   165                        ;size_t write(int fd, void *buffer, size_t count) 
+                    {
+   166                        	code
+   167                        	xdef	~~write
+   168                        	func
+   169                        ~~write:
+   170                        	longa	on
+   171                        	longi	on
+   172 00:0083: 3B           	tsc
+   173 00:0084: 38           	sec
+   174 00:0085: E9 00 00     	sbc	#L15
+   175 00:0088: 1B           	tcs
+   176 00:0089: 0B           	phd
+   177 00:008A: 5B           	tcd
+   178             00000004   fd_0	set	4
+   179             00000006   buffer_0	set	6
+   180             0000000A   count_0	set	10
+   181                        ;	return -1;
+   182 00:008B: A9 FF FF     	lda	#$ffff
+   183                        L17:
+   184 00:008E: A8           	tay
+   185 00:008F: A5 02        	lda	<L15+2
+   186 00:0091: 85 0A        	sta	<L15+2+8
+   187 00:0093: A5 01        	lda	<L15+1
+   188 00:0095: 85 09        	sta	<L15+1+8
+   189 00:0097: 2B           	pld
+   190 00:0098: 3B           	tsc
+   191 00:0099: 18           	clc
+   192 00:009A: 69 08 00     	adc	#L15+8
+   193 00:009D: 1B           	tcs
+   194 00:009E: 98           	tya
+   195 00:009F: 6B           	rtl
+   196                        ;}
+   197             00000000   L15	equ	0
+   198             00000001   L16	equ	1
+   199                        	ends
+   200                        	efunc
+   201                        ;
+   202                        ;long lseek(int fd, long offset, int whence) {
+   203                        	code
+   204                        	xdef	~~lseek
+   205                        	func
+   206                        ~~lseek:
+   207                        	longa	on
+   208                        	longi	on
+   209 00:00A0: 3B           	tsc
+   210 00:00A1: 38           	sec
+   211 00:00A2: E9 00 00     	sbc	#L18
+   212 00:00A5: 1B           	tcs
+   213 00:00A6: 0B           	phd
+   214 00:00A7: 5B           	tcd
+   215             00000004   fd_0	set	4
+   216             00000006   offset_0	set	6
+   217             0000000A   whence_0	set	10
+   218                        ;	return -1;
+   219 00:00A8: A9 FF FF     	lda	#$ffff
+   220 00:00AB: AA           	tax
+   221 00:00AC: A9 FF FF     	lda	#$ffff
+  Mon Jan 16 2017 11:21                                                Page 5
+
+
+   222                        L20:
+   223 00:00AF: A8           	tay
+   224 00:00B0: A5 02        	lda	<L18+2
+   225 00:00B2: 85 0A        	sta	<L18+2+8
+   226 00:00B4: A5 01        	lda	<L18+1
+   227 00:00B6: 85 09        	sta	<L18+1+8
+   228 00:00B8: 2B           	pld
+   229 00:00B9: 3B           	tsc
+   230 00:00BA: 18           	clc
+   231 00:00BB: 69 08 00     	adc	#L18+8
+   232 00:00BE: 1B           	tcs
+   233 00:00BF: 98           	tya
+   234 00:00C0: 6B           	rtl
+   235                        ;}
+   236             00000000   L18	equ	0
+   237             00000001   L19	equ	1
+   238                        	ends
+   239                        	efunc
+   240                        ;
+   241                        ;int creat(const char *name, int mode) {
+   242                        	code
+   243                        	xdef	~~creat
+   244                        	func
+   245                        ~~creat:
+   246                        	longa	on
+   247                        	longi	on
+   248 00:00C1: 3B           	tsc
+   249 00:00C2: 38           	sec
+   250 00:00C3: E9 00 00     	sbc	#L21
+   251 00:00C6: 1B           	tcs
+   252 00:00C7: 0B           	phd
+   253 00:00C8: 5B           	tcd
+   254             00000004   name_0	set	4
+   255             00000008   mode_0	set	8
+   256                        ;	return -1;
+   257 00:00C9: A9 FF FF     	lda	#$ffff
+   258                        L23:
+   259 00:00CC: A8           	tay
+   260 00:00CD: A5 02        	lda	<L21+2
+   261 00:00CF: 85 08        	sta	<L21+2+6
+   262 00:00D1: A5 01        	lda	<L21+1
+   263 00:00D3: 85 07        	sta	<L21+1+6
+   264 00:00D5: 2B           	pld
+   265 00:00D6: 3B           	tsc
+   266 00:00D7: 18           	clc
+   267 00:00D8: 69 06 00     	adc	#L21+6
+   268 00:00DB: 1B           	tcs
+   269 00:00DC: 98           	tya
+   270 00:00DD: 6B           	rtl
+   271                        ;}
+   272             00000000   L21	equ	0
+   273             00000001   L22	equ	1
+   274                        	ends
+   275                        	efunc
+   276                        ;
+   277                        ;int unlink(const char *name) {
+   278                        	code
+   279                        	xdef	~~unlink
+  Mon Jan 16 2017 11:21                                                Page 6
+
+
+   280                        	func
+   281                        ~~unlink:
+   282                        	longa	on
+   283                        	longi	on
+   284 00:00DE: 3B           	tsc
+   285 00:00DF: 38           	sec
+   286 00:00E0: E9 00 00     	sbc	#L24
+   287 00:00E3: 1B           	tcs
+   288 00:00E4: 0B           	phd
+   289 00:00E5: 5B           	tcd
+   290             00000004   name_0	set	4
+   291                        ;	return -1;
+   292 00:00E6: A9 FF FF     	lda	#$ffff
+   293                        L26:
+   294 00:00E9: A8           	tay
+   295 00:00EA: A5 02        	lda	<L24+2
+   296 00:00EC: 85 06        	sta	<L24+2+4
+   297 00:00EE: A5 01        	lda	<L24+1
+   298 00:00F0: 85 05        	sta	<L24+1+4
+   299 00:00F2: 2B           	pld
+   300 00:00F3: 3B           	tsc
+   301 00:00F4: 18           	clc
+   302 00:00F5: 69 04 00     	adc	#L24+4
+   303 00:00F8: 1B           	tcs
+   304 00:00F9: 98           	tya
+   305 00:00FA: 6B           	rtl
+   306                        ;}
+   307             00000000   L24	equ	0
+   308             00000001   L25	equ	1
+   309                        	ends
+   310                        	efunc
+   311                        ;
+   312                        	xref	~~fopen
+   313                        	xref	~~fclose
+   314                        	end
+
+
+      Lines assembled: 314
+      Errors: 0
