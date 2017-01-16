@@ -33,7 +33,7 @@ mingw/err.o : mingw/err.c mingw/err.h
 
 .PHONY: clean
 clean:
-	$(RM) wdcdumpobj $(DUMP_OBJS) $(LINK_OBJS)
+	$(RM) wdcdumpobj wdclink $(DUMP_OBJS) $(LINK_OBJS)
 
 
 .PHONY: variables
