@@ -38,3 +38,13 @@ int creat(const char *name, int mode) {
 int unlink(const char *name) {
 	return -1;
 }
+
+int isatty(int fd) {
+	return -1;
+}
+
+
+#pragma section udata=heap
+char __heap[8092];
+void *heap_start = (void *)__heap;
+void *heap_end = (void *)&__heap[8092];

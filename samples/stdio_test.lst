@@ -1,4 +1,4 @@
-  Mon Jan 16 2017 11:21                                                Page 1
+  Mon Jan 16 2017 13:57                                                Page 1
 
 
                      ***************************************
@@ -59,7 +59,7 @@
     50                        	data
     51                        L1:
     52 00:0000: 66 69 6C 65  	db	$66,$69,$6C,$65,$2E,$74,$78,$74,$00,$77,
-  Mon Jan 16 2017 11:21                                                Page 2
+  Mon Jan 16 2017 13:57                                                Page 2
 
 
                     $62,$00
@@ -120,7 +120,7 @@
    104 00:004F: 0B           	phd
    105 00:0050: 5B           	tcd
    106             00000004   fd_0	set	4
-  Mon Jan 16 2017 11:21                                                Page 3
+  Mon Jan 16 2017 13:57                                                Page 3
 
 
    107                        ;	return -1;
@@ -181,7 +181,7 @@
    162                        	ends
    163                        	efunc
    164                        ;
-  Mon Jan 16 2017 11:21                                                Page 4
+  Mon Jan 16 2017 13:57                                                Page 4
 
 
    165                        ;size_t write(int fd, void *buffer, size_t count) 
@@ -242,7 +242,7 @@
    219 00:00A8: A9 FF FF     	lda	#$ffff
    220 00:00AB: AA           	tax
    221 00:00AC: A9 FF FF     	lda	#$ffff
-  Mon Jan 16 2017 11:21                                                Page 5
+  Mon Jan 16 2017 13:57                                                Page 5
 
 
    222                        L20:
@@ -303,7 +303,7 @@
    277                        ;int unlink(const char *name) {
    278                        	code
    279                        	xdef	~~unlink
-  Mon Jan 16 2017 11:21                                                Page 6
+  Mon Jan 16 2017 13:57                                                Page 6
 
 
    280                        	func
@@ -338,10 +338,71 @@
    309                        	ends
    310                        	efunc
    311                        ;
-   312                        	xref	~~fopen
-   313                        	xref	~~fclose
-   314                        	end
+   312                        ;int isatty(int fd) {
+   313                        	code
+   314                        	xdef	~~isatty
+   315                        	func
+   316                        ~~isatty:
+   317                        	longa	on
+   318                        	longi	on
+   319 00:00FB: 3B           	tsc
+   320 00:00FC: 38           	sec
+   321 00:00FD: E9 00 00     	sbc	#L27
+   322 00:0100: 1B           	tcs
+   323 00:0101: 0B           	phd
+   324 00:0102: 5B           	tcd
+   325             00000004   fd_0	set	4
+   326                        ;	return -1;
+   327 00:0103: A9 FF FF     	lda	#$ffff
+   328                        L29:
+   329 00:0106: A8           	tay
+   330 00:0107: A5 02        	lda	<L27+2
+   331 00:0109: 85 04        	sta	<L27+2+2
+   332 00:010B: A5 01        	lda	<L27+1
+   333 00:010D: 85 03        	sta	<L27+1+2
+   334 00:010F: 2B           	pld
+   335 00:0110: 3B           	tsc
+   336 00:0111: 18           	clc
+   337 00:0112: 69 02 00     	adc	#L27+2
+  Mon Jan 16 2017 13:57                                                Page 7
 
 
-      Lines assembled: 314
+   338 00:0115: 1B           	tcs
+   339 00:0116: 98           	tya
+   340 00:0117: 6B           	rtl
+   341                        ;}
+   342             00000000   L27	equ	0
+   343             00000001   L28	equ	1
+   344                        	ends
+   345                        	efunc
+   346                        ;
+   347                        ;
+   348                        ;#pragma section udata=heap
+   349                        heap	section
+   350 00:0000:              	ends
+   351                        ;char __heap[8092];
+   352                        ;void *heap_start = (void *)__heap;
+   353                        	data
+   354                        	xdef	~~heap_start
+   355                        ~~heap_start:
+   356 00:000C: xx xx xx xx  	dl	~~__heap
+   357 00:0010:              	ends
+   358                        ;void *heap_end = (void *)&__heap[8092];
+   359                        	data
+   360                        	xdef	~~heap_end
+   361                        ~~heap_end:
+   362 00:0010: xx xx xx xx  	dl	~~__heap+8092
+   363 00:0014:              	ends
+   364                        ;
+   365                        	xref	~~fopen
+   366                        	xref	~~fclose
+   367                        	heap
+   368                        	xdef	~~__heap
+   369                        ~~__heap
+   370 00:0000:              	ds	8092
+   371 00:1F9C:              	ends
+   372                        	end
+
+
+      Lines assembled: 372
       Errors: 0
