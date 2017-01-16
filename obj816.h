@@ -19,7 +19,7 @@ typedef struct Mod_head {
 	uint16_t h_optsize;			/* sizeof options section */
  	uint8_t h_tot_secs;	/*  total number of sections in module */
 	uint8_t h_num_secs;	/*  number of sections referenced */
- 	uint16_t h_num_syms;	/*  number of symbols */
+	uint16_t h_num_syms;	/*  number of symbols */
 } Mod_head;
 
 typedef struct Lib_head {
@@ -30,7 +30,7 @@ typedef struct Lib_head {
 	uint32_t l_modstart;			/* offset of modules start */
 	uint32_t l_numsyms;				/* number of symbol entries */
 	uint32_t l_symsize;				/* sizeof symbol section */
- 	uint32_t l_numfiles;			/* number of files */
+	uint32_t l_numfiles;			/* number of files */
 } Lib_head;
 
 #define MOD_CONVERT	"lwbblslsbbw"

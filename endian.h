@@ -2,7 +2,6 @@
 #define endian_h
 
 enum class endian {
-
 #ifdef _WIN32
     little = 1234,
     big    = 4321,

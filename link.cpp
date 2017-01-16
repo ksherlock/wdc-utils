@@ -11,6 +11,8 @@
 #include <err.h>
 #include <assert.h>
 #include <stdio.h>
+#include <errno.h>
+#include <strings.h>
 #include <cctype>
 
 #include <string>
@@ -18,6 +20,9 @@
 #include <algorithm>
 #include <unordered_map>
 #include <unordered_set>
+#include <map>
+#include <set>
+
 #include <array>
 #include <utility>
 #include <numeric>
@@ -40,6 +45,9 @@ struct {
 	bool _X = false;
 	bool _S = false;
 	std::string _o;
+
+	std::vector<std::string> _l;
+	std::vector<std::string> _L;
 
 	unsigned _errors = 0;
 	uint16_t _file_type;
@@ -213,7 +221,7 @@ std::vector<section> sections;
 std::unordered_map<std::string, int> symbol_map;
 std::vector<symbol> symbols;
 
-std::unordered_set<std::string> undefined_symbols;
+std::set<std::string> undefined_symbols;
 
 
 
@@ -264,7 +272,10 @@ void simplify() {
  *
  */
 
-void one_module(const std::vector<uint8_t> &data, const std::vector<uint8_t> &section_data, const std::vector<uint8_t> &symbol_data) {
+void one_module(const std::vector<uint8_t> &data, 
+	const std::vector<uint8_t> &section_data, 
+	const std::vector<uint8_t> &symbol_data,
+	std::set<std::string> *local_undefined = nullptr) {
 
 	std::array<int, 256> remap_section;
 
@@ -311,6 +322,9 @@ void one_module(const std::vector<uint8_t> &data, const std::vector<uint8_t> &se
 	// convert local symbols to global.
 	for (auto &s : local_symbols) {
 		if (s.type == S_UND) {
+			if ((s.flags & SF_REF) == 0) continue; // ????
+
+
 			auto iter = symbol_map.find(s.name);
 			if (iter == symbol_map.end()) {
 				s.section = symbols.size();
@@ -321,6 +335,10 @@ void one_module(const std::vector<uint8_t> &data, const std::vector<uint8_t> &se
 				// already exists... 
 				const auto &ss = symbols[iter->second];
 				if (ss.type != S_UND) s = ss;
+			}
+
+			if (local_undefined) {
+				if (s.type == S_UND) local_undefined->emplace(s.name);
 			}
 			continue;
 		}
@@ -337,6 +355,7 @@ void one_module(const std::vector<uint8_t> &data, const std::vector<uint8_t> &se
 
 		constexpr const unsigned mask = SF_GBL | SF_DEF;
 		if ((s.flags & mask) == mask) {
+
 
 			auto iter = symbol_map.find(s.name);
 
@@ -408,6 +427,7 @@ void one_module(const std::vector<uint8_t> &data, const std::vector<uint8_t> &se
 
 				e.offset =  data_ptr->size();
 				e.size = read_8(iter);
+
 
 				data_ptr->insert(data_ptr->end(), e.size, 0);
 
@@ -639,6 +659,10 @@ void to_omf(const expression &e, omf::segment &seg) {
 	if (e.stack.empty() || e.size == 0) {
 		expr_error(false, e, "Expression empty");
 		return;
+	}
+
+	if (e.size < 1 || e.size > 4) {
+		expr_error(true, e, "Expression size must be 1-4 bytes");
 	}
 
 
@@ -940,9 +964,89 @@ void build_omf_segments() {
 }
 
 
+bool one_module(const std::string &name, int fd, std::set<std::string> *local_undefined = nullptr) {
+	Mod_head h;
+	ssize_t ok;
 
+	ok = read(fd, &h, sizeof(h));
+	if (ok == 0) return false;
+
+	if (ok < sizeof(h)) {
+		warnx("Invalid object file: %s", name.c_str());
+		return false;;
+	}
+
+	le_to_host(h.h_magic);
+	le_to_host(h.h_version);
+	le_to_host(h.h_filtyp);
+	le_to_host(h.h_namlen);
+	le_to_host(h.h_recsize);
+	le_to_host(h.h_secsize);
+	le_to_host(h.h_symsize);
+	le_to_host(h.h_optsize);
+	le_to_host(h.h_tot_secs);
+	le_to_host(h.h_num_secs);
+	le_to_host(h.h_num_syms);
+
+	assert(h.h_magic == MOD_MAGIC);
+	assert(h.h_version == 1);
+	assert(h.h_filtyp == 1);
+
+
+	std::string module_name;
+	{
+		// now read the name (h_namlen includes 0 terminator.)
+		std::vector<char> tmp;
+		tmp.resize(h.h_namlen);
+		ok = read(fd, tmp.data(), h.h_namlen);
+		if (ok != h.h_namlen) {
+			warnx("Invalid object file: %s", name.c_str());
+			return false;
+		}
+		module_name.assign(tmp.data());
+	}
+
+	std::vector<uint8_t> record_data;
+	std::vector<uint8_t> symbol_data;
+	std::vector<uint8_t> section_data;
+
+	record_data.resize(h.h_recsize);
+	ok = read(fd, record_data.data(), h.h_recsize);
+	if (ok != h.h_recsize) {
+		warnx("Truncated object file: %s", name.c_str());
+		return false;
+	}
+
+	section_data.resize(h.h_secsize);
+	ok = read(fd, section_data.data(), h.h_secsize);
+	if (ok != h.h_secsize) {
+		warnx("Truncated object file: %s", name.c_str());
+		return false;
+	}
+
+	symbol_data.resize(h.h_symsize);
+	ok = read(fd, symbol_data.data(), h.h_symsize);
+	if (ok != h.h_symsize)  {
+		warnx("Truncated object file: %s", name.c_str());
+		return false;
+	}
+
+	if (flags._v) {
+		printf("Processing %s:%s\n", name.c_str(), module_name.c_str());
+	}
+
+	// should probably pass in name and module....
+	one_module(record_data, section_data, symbol_data, local_undefined);
+	
+
+	if (h.h_optsize) lseek(fd, h.h_optsize, SEEK_CUR);
+
+	return true;
+}
 
 bool one_file(const std::string &name) {
+
+	if (flags._v) printf("Processing %s\n", name.c_str());
 
 	int fd = open(name.c_str(), O_RDONLY | O_BINARY);
 	if (fd < 0) {
@@ -978,88 +1082,181 @@ bool one_file(const std::string &name) {
 		return true;
 	}
 
-	//
-	rv = true;
 	lseek(fd, 0, SEEK_SET);
-	for(;;) {
-		Mod_head h;
+	while(one_module(name, fd)) ;
 
-		ok = read(fd, &h, sizeof(h));
-		if (ok == 0) break; // eof.
+	close(fd);
+	return true;
+}
 
-		rv = false;
-		if (ok < sizeof(h)) {
-			warnx("Invalid object file: %s", name.c_str());
-			break;
+
+enum {
+	kPending = 1,
+	kProcessed = 2,
+};
+
+bool intersection(const std::map<std::string, uint32_t> &a,
+	const std::set<std::string> &b, 
+	std::map<uint32_t, int> &c)
+{
+	auto a_iter = a.begin();
+	auto b_iter = b.begin();
+
+	bool rv = false;
+
+	while (a_iter != a.end() && b_iter != b.end()) {
+
+		int cmp = strcmp(a_iter->first.c_str(), b_iter->c_str());
+		if (cmp < 0) a_iter++;
+		else if (cmp > 0) b_iter++;
+		else {
+			// insert/emplace does not overwrite a previous value.
+			c.emplace(a_iter->second, kPending);
+			a_iter++;
+			b_iter++;
+			rv = true;
 		}
-
-		le_to_host(h.h_magic);
-		le_to_host(h.h_version);
-		le_to_host(h.h_filtyp);
-		le_to_host(h.h_namlen);
-		le_to_host(h.h_recsize);
-		le_to_host(h.h_secsize);
-		le_to_host(h.h_symsize);
-		le_to_host(h.h_optsize);
-		le_to_host(h.h_tot_secs);
-		le_to_host(h.h_num_secs);
-		le_to_host(h.h_num_syms);
-
-		assert(h.h_magic == MOD_MAGIC);
-		assert(h.h_version == 1);
-		assert(h.h_filtyp == 1);
-
-
-		std::string module_name;
-		{
-			// now read the name (h_namlen includes 0 terminator.)
-			std::vector<char> tmp;
-			tmp.resize(h.h_namlen);
-			ok = read(fd, tmp.data(), h.h_namlen);
-			if (ok != h.h_namlen) {
-				warnx("Invalid object file: %s", name.c_str());
-				break;
-			}
-			module_name.assign(tmp.data());
-		}
-
-		std::vector<uint8_t> record_data;
-		std::vector<uint8_t> symbol_data;
-		std::vector<uint8_t> section_data;
-
-		record_data.resize(h.h_recsize);
-		ok = read(fd, record_data.data(), h.h_recsize);
-		if (ok != h.h_recsize) {
-			warnx("Truncated object file: %s", name.c_str());
-			break;
-		}
-
-		section_data.resize(h.h_secsize);
-		ok = read(fd, section_data.data(), h.h_secsize);
-		if (ok != h.h_secsize) {
-			warnx("Truncated object file: %s", name.c_str());
-			break;
-		}
-
-		symbol_data.resize(h.h_symsize);
-		ok = read(fd, symbol_data.data(), h.h_symsize);
-		if (ok != h.h_symsize)  {
-			warnx("Truncated object file: %s", name.c_str());
-			break;
-		}
-
-		if (flags._v) {
-			printf("Processing %s:%s\n", name.c_str(), module_name.c_str());
-		}
-
-		// should probably pass in name and module....
-		one_module(record_data, section_data, symbol_data);
-		rv = true;
 	}
 
 
-	close(fd);
 	return rv;
+}
+
+
+bool one_lib(const std::string &path) {
+
+	Lib_head h;
+
+	int fd = open(path.c_str(), O_RDONLY | O_BINARY);
+	if (fd < 0) {
+		if (errno == ENOENT) return false;
+	}
+
+	if (flags._v) printf("Processing library %s\n", path.c_str());
+
+	if (fd < 0) {
+		warn("Unable to open %s", path.c_str());
+		return false;
+	}
+
+	ssize_t ok;
+
+	ok = read(fd, &h, sizeof(h));
+	if (ok != sizeof(h)) {
+		warnx("Invalid library file: %s", path.c_str());
+		close(fd);
+		return false;
+	}
+
+	le_to_host(h.l_magic);
+	le_to_host(h.l_version);
+	le_to_host(h.l_filtyp);
+	le_to_host(h.l_unused1);
+	le_to_host(h.l_modstart);
+	le_to_host(h.l_numsyms);
+	le_to_host(h.l_symsize);
+	le_to_host(h.l_numfiles);
+
+	if (h.l_magic != MOD_MAGIC || h.l_version != MOD_VERSION || h.l_filtyp != MOD_LIBRARY) {
+		warnx("Invalid library file: %s", path.c_str());
+		close(fd);
+		return false;
+	}
+
+	// read the symbol dictionary.
+
+	std::vector<uint8_t> data;
+	data.reserve(h.l_modstart - sizeof(h));
+	ok = read(fd, data.data(), data.size());
+	if (ok != data.size()) {
+		warnx("Invalid library file: %s", path.c_str());
+		return false;
+	}
+
+	auto iter = data.begin();
+	auto end = data.end();
+
+
+	// files -- only reading since it's variable length.
+	for (unsigned i = 0; i < h.l_numfiles; ++i) {
+
+		// fileno, pstring file name
+		uint16_t fileno = read_16(iter);
+		uint8_t size = read_8(iter);
+		iter += size; // don't care about the name.
+	}
+
+	std::map<std::string, uint32_t> lib_symbol_map;
+
+
+	// map of which modules have been loaded or are pending processing.
+	std::map<uint32_t, int> modules;
+
+
+	auto name_iter = iter + h.l_numsyms * 8;
+	for (unsigned i = 0; i < h.l_numsyms; ++i) {
+		uint16_t name_offset = read_16(iter);
+		uint16_t file_number = read_16(iter);
+		uint32_t offset = read_32(iter) + h.l_modstart;
+
+		auto tmp = name_iter + name_offset;
+		std::string name = read_pstring(tmp);
+
+		lib_symbol_map.emplace(std::move(name), offset);
+
+		//modules[offset] = 0;
+	}
+
+
+
+
+
+	// find an intersection of undefined symbols and symbols defined in lib_symbol_map
+
+	if (!intersection(lib_symbol_map, undefined_symbols, modules)) {
+		close(fd);
+		return true;
+	}
+
+	for(;;) {
+		bool delta = false;
+
+		std::set<std::string> local_undefined_symbols;
+
+
+		for (auto &x : modules) {
+			uint32_t offset = x.first;
+			int status = x.second;
+
+			if (status == kPending) {
+				x.second = kProcessed;
+				lseek(fd, offset, SEEK_SET);
+				one_module(path, fd, &local_undefined_symbols);
+				delta = true;
+			}
+		}
+		if (!delta) break;
+
+		delta = intersection(lib_symbol_map, local_undefined_symbols, modules);
+		if (!delta) break;
+	}
+
+	close(fd);
+	return true;
+}
+
+void libraries() {
+
+	if (undefined_symbols.empty()) return;
+
+	for (auto &l : flags._l) {
+		for (auto &L : flags._L) {
+			std::string path = L + "lib" + l;
+
+			if (one_lib(path)) break;
+		}
+		if (undefined_symbols.empty()) break;
+	}
 }
 
 #if 0
@@ -1141,9 +1338,6 @@ void usage() {
 
 int main(int argc, char **argv) {
 
-	std::vector<std::string> _l;
-	std::vector<std::string> _L;
-
 
 	int c;
 	while ((c = getopt(argc, argv, "vCXL:l:o:t:")) != -1) {
@@ -1152,8 +1346,17 @@ int main(int argc, char **argv) {
 			case 'X': flags._X = true; break;
 			case 'C': flags._C = true; break;
 			case 'o': flags._o = optarg; break;
-			case 'l': _l.emplace_back(optarg); break;
-			case 'L': _L.emplace_back(optarg); break;
+			case 'l': {
+				if (*optarg) flags._l.emplace_back(optarg);
+				break;
+			}
+			case 'L': {
+				std::string tmp(optarg);
+				if (tmp.empty()) tmp = ".";
+				if (tmp.back() != '/') tmp.push_back('/');
+				flags._L.emplace_back(std::move(tmp));
+				break;
+			}
 			case 'h': help(); break;
 			case 't': {
 				// -t xx[:xxxx] -- set file/auxtype.
@@ -1181,17 +1384,20 @@ int main(int argc, char **argv) {
 		if (!one_file(argv[i])) flags._errors++;
 	}
 
-	//
-	simplify();
 
-	// for each undefined, try to find it in a library...
-	// ... except for the _BEG / _END symbols!
-
-	for (const auto & s : undefined_symbols) {
-		printf("%s\n", s.c_str());
+	if (flags._v && !undefined_symbols.empty()) {
+		printf("Undefined Symbols:\n");
+		for (const auto & s : undefined_symbols) {
+			printf("%s\n", s.c_str());
+		}
+		printf("\n");
 	}
 
+	if (!undefined_symbols.empty()) libraries();
+	//
+
 	generate_end();
+	simplify();
 
 
 	if (flags._v) {
