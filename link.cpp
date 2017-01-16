@@ -12,7 +12,7 @@
 #include <assert.h>
 #include <stdio.h>
 #include <errno.h>
-#include <strings.h>
+#include <string.h>
 #include <cctype>
 
 #include <string>
