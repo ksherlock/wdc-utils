@@ -412,48 +412,6 @@ void save_omf(const std::string &path, std::vector<omf::segment> &segments, bool
 		uint32_t reloc_size = 0;
 
 		reloc_size = add_relocs(data, data_offset, s, compress);
-#if 0
-		// should interseg/reloc records be sorted?
-		// todo -- compress into super records.
-		for (const auto &r : s.relocs) {
-			if (r.can_compress()) {
-				push(data, (uint8_t)0xf5);
-				push(data, (uint8_t)r.size);
-				push(data, (uint8_t)r.shift);
-				push(data, (uint16_t)r.offset);
-				push(data, (uint16_t)r.value);
-				reloc_size += 7;
-			} else {
-				push(data, (uint8_t)0xe5);
-				push(data, (uint8_t)r.size);
-				push(data, (uint8_t)r.shift);
-				push(data, (uint32_t)r.offset);
-				push(data, (uint32_t)r.value);
-				reloc_size += 11;
-			}
-		}
-
-		for (const auto &r : s.intersegs) {
-			if (r.can_compress()) {
-				push(data, (uint8_t)0xf6);
-				push(data, (uint8_t)r.size);
-				push(data, (uint8_t)r.shift);
-				push(data, (uint16_t)r.offset);
-				push(data, (uint8_t)r.segment);
-				push(data, (uint16_t)r.segment_offset);
-				reloc_size += 8;
-			} else {
-				push(data, (uint8_t)0xe3);
-				push(data, (uint8_t)r.size);
-				push(data, (uint8_t)r.shift);
-				push(data, (uint32_t)r.offset);
-				push(data, (uint16_t)r.file);
-				push(data, (uint16_t)r.segment);
-				push(data, (uint32_t)r.segment_offset);
-				reloc_size += 15;
-			}
-		}
-#endif
 
 		// end-of-record
 		push(data, (uint8_t)omf::END);
