@@ -830,15 +830,6 @@ void to_omf(const expression &e, omf::segment &seg) {
 				r.offset = e.offset;
 				r.value = value;
 
-
-				#if 0
-				// handle later.
-				// if generating a super, store inline.
-				if (!flags._C && r.can_compress()) {
-					for (int i = 0; i < e.size; ++i, value >>= 8)
-						seg.data[e.offset + i] = value & 0xff;
-				}
-				#endif
 				seg.relocs.emplace_back(r);
 			} else {
 				omf::interseg r;
@@ -1050,7 +1041,12 @@ void build_omf_segments() {
 
 	// now adjust all the expressions, simplify, and convert to reloc records.
 	for (auto &s :sections) {
+
+		auto &x = remap[s.number];
+
 		for (auto &e : s.expressions) {
+
+			e.offset += x.second;
 
 			for (auto &t : e.stack) {
 				if (t.tag == OP_LOC) {
