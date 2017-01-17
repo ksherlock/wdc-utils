@@ -931,21 +931,6 @@ void build_omf_segments() {
 	remap.resize(sections.size());
 
 
-#if 0
-	if (!flags._X) {
-		// create an expressload segments.
-		// (should verify it's expressable later...)
-		omf::segment seg;
-		seg.segnum = omf_segments.size()+ 1;
-		seg.kind = 0x8001; // dynamic data segment
-		seg.segname = "~ExpressLoad";
-
-		omf_segments.emplace_back(std::move(seg));
-
-	}
-#endif
-
-
 	// if data + code can fit in one bank, merge them
 	// otherwise, merge all data sections and 1 omf segment
 	// per code section.
@@ -985,32 +970,34 @@ void build_omf_segments() {
 	if (total_data_size + sections[SECT_CODE].size > 0xffff) {
 
 		omf_segments.emplace_back();
-
 		auto &seg = omf_segments.back();
 		data_segment = seg.segnum = omf_segments.size();
 		seg.kind = 0x0001; // static data segment.
 	}
 
-	//omf::segment &code_seg = omf_segments[code_segment-1];
-	omf::segment &data_seg = omf_segments[data_segment-1];
 
-
-	// KDATA, DATA, UDATA, other segment order.
-	for (auto &s : sections) {
-		if (s.flags & SEC_REF_ONLY) continue;
-		if ((s.flags & SEC_DATA) == 0) continue;
-
-		remap[s.number] = std::make_pair(data_segment, data_seg.data.size());
-
-		append(data_seg.data, s.data);
-		s.data.clear();
-	}
-
-	// add in UDATA
 	{
-		auto &s = sections[SECT_UDATA];
-		remap[s.number] = std::make_pair(data_segment, data_seg.data.size());
-		append(data_seg.data, s.size, (uint8_t)0);
+		omf::segment &data_seg = omf_segments[data_segment-1];
+
+
+		// KDATA, DATA, UDATA, other segment order.
+		for (auto &s : sections) {
+			if (s.flags & SEC_REF_ONLY) continue;
+			if ((s.flags & SEC_DATA) == 0) continue;
+
+			remap[s.number] = std::make_pair(data_segment, data_seg.data.size());
+
+			append(data_seg.data, s.data);
+			s.data.clear();
+		}
+
+		// add in UDATA
+		{
+			auto &s = sections[SECT_UDATA];
+			remap[s.number] = std::make_pair(data_segment, data_seg.data.size());
+			append(data_seg.data, s.size, (uint8_t)0);
+		}
+		// data_seg no longer valid since emplace_back() may invalidate.
 	}
 
 	// for all other sections, create a new segment.
@@ -1019,16 +1006,17 @@ void build_omf_segments() {
 		if (s.flags & SEC_DATA) continue;
 		if (s.number == SECT_CODE) continue;
 
-		omf::segment seg;
-		seg.segnum = omf_segments.size() + 1;
+
+		omf_segments.emplace_back();
+		auto &seg = omf_segments.back();
+
+		seg.segnum = omf_segments.size();
 		seg.kind = 0x0000; // static code.
 		seg.data = std::move(s.data);
 		seg.segname = s.name;
 		s.data.clear();
 
 		remap[s.number] = std::make_pair(seg.segnum, 0);
-
-		omf_segments.emplace_back(std::move(seg));
 	}
 
 
@@ -1042,8 +1030,11 @@ void build_omf_segments() {
 			// ????
 			size = (size + 255) & ~255;
 
-			omf::segment seg;
-			seg.segnum = omf_segments.size() + 1;
+
+			omf_segments.emplace_back();
+			auto &seg = omf_segments.back();
+
+			seg.segnum = omf_segments.size();
 			seg.kind = 0x12; // static dp/stack segment.
 			seg.data.resize(size, 0);
 			seg.loadname = "~Stack";
@@ -1069,7 +1060,9 @@ void build_omf_segments() {
 				}
 			}
 			simplify_expression(e);
-			to_omf(e, omf_segments[s.number-1]);
+
+			unsigned segnum = remap[s.number].first;
+			to_omf(e, omf_segments.at(segnum-1));
 		}
 	}
 
