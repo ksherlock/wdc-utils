@@ -3,9 +3,11 @@
 
 
 void main(void) {
-	
-	FILE *fp = fopen("file.txt", "wb");
+	FILE *fp;
 
+	fputs("hello, world\n", stdout);
+
+	fp = fopen("file.txt", "wb");
 	fclose(fp);
 }
 
@@ -24,7 +26,30 @@ size_t read(int fd, void *buffer, size_t count) {
 }
 
 size_t write(int fd, void *buffer, size_t count) {
-	return -1;
+	static struct {
+		unsigned pCount;
+		unsigned refNum;
+		void *dataBuffer;
+		unsigned long requestCount;
+		unsigned long transferCount;
+		unsigned cachePriority;
+	} dcb;
+
+	unsigned tool_error = 0x0043;
+
+	dcb.pCount = 4;
+	dcb.refNum = fd+1;
+	dcb.dataBuffer = buffer;
+	dcb.requestCount = count;
+	#asm
+	pea #$2012
+	pea #^%%dcb
+	pea #%%dcb
+	jsl $e100b0
+	sta %%tool_error;
+	#endasm
+	if (tool_error) return -1;
+	return dcb.transferCount;
 }
 
 long lseek(int fd, long offset, int whence) {
@@ -45,6 +70,6 @@ int isatty(int fd) {
 
 
 #pragma section udata=heap
-char __heap[8092];
+char __heap[8192];
 void *heap_start = (void *)__heap;
 void *heap_end = (void *)&__heap[8092];
