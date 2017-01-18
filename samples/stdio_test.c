@@ -26,19 +26,18 @@ int close(int fd) {
 	return -1;
 }
 
-size_t read(int fd, void *buffer, size_t count) {
-	return -1;
-}
 
-size_t write(int fd, void *buffer, size_t count) {
-	static struct {
-		unsigned pCount;
-		unsigned refNum;
-		void *dataBuffer;
-		unsigned long requestCount;
-		unsigned long transferCount;
-		unsigned cachePriority;
-	} dcb;
+size_t read(int fd, void *buffer, size_t count) {
+
+static struct {
+	unsigned pCount;
+	unsigned refNum;
+	void *dataBuffer;
+	unsigned long requestCount;
+	unsigned long transferCount;
+	unsigned cachePriority;
+} dcb;
+
 
 	unsigned tool_error = 0x0043;
 
@@ -50,6 +49,36 @@ size_t write(int fd, void *buffer, size_t count) {
 	pea #^%%dcb
 	pea #%%dcb
 	pea #$2012
+	jsl $e100b0
+	sta %%tool_error;
+	#endasm
+	if (tool_error) return -1;
+	return dcb.transferCount;
+
+}
+
+size_t write(int fd, void *buffer, size_t count) {
+
+static struct {
+	unsigned pCount;
+	unsigned refNum;
+	void *dataBuffer;
+	unsigned long requestCount;
+	unsigned long transferCount;
+	unsigned cachePriority;
+} dcb;
+
+
+	unsigned tool_error = 0x0043;
+
+	dcb.pCount = 4;
+	dcb.refNum = fd+1;
+	dcb.dataBuffer = buffer;
+	dcb.requestCount = count;
+	#asm
+	pea #^%%dcb
+	pea #%%dcb
+	pea #$2013
 	jsl $e100b0
 	sta %%tool_error;
 	#endasm
