@@ -235,6 +235,9 @@ bool dump_obj(const char *name, int fd)
 	ok = read(fd, symbol_data.data(), h.h_symsize);
 	if (ok != h.h_symsize) errx(EX_DATAERR, "%s symbols truncated", name);
 
+	if (h.h_optsize) lseek(fd, h.h_optsize, SEEK_CUR);
+
+
 	zrdz_disassembler d(read_sections(section_data), read_symbols(symbol_data));
 
 	uint8_t op = REC_END;
@@ -307,7 +310,7 @@ bool dump_obj(const char *name, int fd)
 							case OP_NOT:
 							case OP_NEG:
 							case OP_FLP: {
-								static const char *ops[] = {
+								static const std::string ops[] = {
 									".NOT.", "-", "\\"
 								};
 
@@ -319,12 +322,24 @@ bool dump_obj(const char *name, int fd)
 							}
 
 							// binary operators
-							case OP_SHR: 
+							case OP_EXP:
+							case OP_MUL:
+							case OP_DIV:
+							case OP_MOD:
+							case OP_SHR:
 							case OP_SHL:
-							case OP_ADD: 
-							case OP_SUB: {
-								static const char *ops[] = {
-									"**", "*", "/", ".MOD.", ">>", "<<", "+", "-", "&", "|", "^", "=", ">", "<"
+							case OP_ADD:
+							case OP_SUB:
+							case OP_AND:
+							case OP_OR:
+							case OP_XOR:
+							case OP_EQ:
+							case OP_GT:
+							case OP_LT:
+							case OP_UGT:
+							case OP_ULT: {
+								static const std::string ops[] = {
+									"**", "*", "/", ".MOD.", ">>", "<<", "+", "-", "&", "|", "^", "=", ">", "<", ".UGT.", ".ULT."
 
 								};
 								if (stack.size() < 2) errx(EX_DATAERR, "%s : stack underflow error", name);
@@ -568,11 +583,14 @@ void dump_lib(const char *name, int fd)
 	assert(h.l_version == 1);
 	assert(h.l_filtyp == 2);
 
-	printf("modstart      : $%04x\n", h.l_modstart);
-	printf("number symbols: $%04x\n", h.l_numsyms);
-	printf("number files  : $%04x\n", h.l_numfiles);
-
+	printf("; library %s\n\n", name);
+	/*
+	printf("; modstart      : $%04x\n", h.l_modstart);
+	printf("; number symbols: $%04x\n", h.l_numsyms);
+	printf("; number files  : $%04x\n", h.l_numfiles);
 	printf("\n");
+	*/
+
 	std::vector<uint8_t> data;
 	long count = h.l_modstart - sizeof(h);
 	if (count < 0) errx(EX_DATAERR, "%s", name);
@@ -582,29 +600,31 @@ void dump_lib(const char *name, int fd)
 
 
 	// files
+	printf("; files:\n");
 	auto iter = data.begin();
 	for (int i = 0; i < h.l_numfiles; ++i) {
 		uint16_t file_number = read_16(iter);
 		std::string s = read_pstring(iter);
-		printf("$%02x %s\n", file_number, s.c_str());
+		printf("; $%02x %s\n", file_number, s.c_str());
 	}
 	printf("\n");
 
 	// symbols
+	printf("; symbols:\n");
 	auto name_iter = iter + h.l_numsyms * 8;
 	for (int i = 0; i < h.l_numsyms; ++i) {
 		uint16_t name_offset = read_16(iter);
 		uint16_t file_number = read_16(iter);
 		uint32_t offset = read_32(iter);
-		std::string name = read_pstring(name_iter);
+		auto tmp = name_iter + name_offset;
+		std::string name = read_pstring(tmp);
 
-		printf("symbol       : $%04x %s\n", i, name.c_str());
+		printf("; $%04x %s\n", i, name.c_str());
 		//printf("name offset: %02x\n", name_offset);
-		printf("file_number  : $%02x\n", file_number);
-		printf("module offset: $%04x\n", offset); 
+		//printf("file_number  : $%02x\n", file_number);
+		//printf("module offset: $%04x\n", offset); 
 	}
 	printf("\n");
-
 }
 
 void dump(const char *name) {
