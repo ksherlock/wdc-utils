@@ -223,7 +223,145 @@ std::vector<symbol> symbols;
 
 std::set<std::string> undefined_symbols;
 
+inline std::string parenthesize(const std::string &s) {
+	std::string tmp;
+	tmp.push_back('(');
+	tmp.append(s);
+	tmp.push_back(')');
+	return tmp;
+}
 
+inline void expr_error(bool fatal, const expression &e, const char *msg) {
+	warnx("%s:%04x %s", sections[e.section].name.c_str(), e.offset, msg);
+
+	// pretty-print the expression...
+	bool underflow = false;
+
+	struct pair { std::string name; int precedence = 0; };
+
+	std::vector<pair> stack;
+
+	int p;
+	for (auto &x : e.stack) {
+		auto tag = x.tag;
+		switch(tag) {
+
+			case OP_VAL: {
+				p = 0;
+				char buffer[6];
+				snprintf(buffer, sizeof(buffer), "$%02x", x.value);
+				stack.emplace_back(pair{buffer, p});
+				break;
+			}
+			case OP_SYM: {
+				p = 0;
+				stack.emplace_back(pair{symbols[x.section].name, p});
+				break;
+			}
+			case OP_LOC: {
+				p = 0;
+				std::string tmp = sections[x.section].name;
+				if (x.value) {
+					char buffer[6];
+					snprintf(buffer, sizeof(buffer), "$%02x", x.value);
+					tmp.push_back('+');
+					tmp.append(buffer);
+					p = 3;
+				}
+				stack.emplace_back(pair{tmp, p});
+				break;
+			}
+
+			case OP_NOT:
+			case OP_NEG:
+			case OP_FLP: {
+				static const std::string ops[] = {
+					".NOT.", "-", "\\"
+				};
+				p = 0;
+				if (stack.empty()) {
+					underflow = true;
+				} else {
+					auto &back = stack.back();
+					if (p < back.precedence) {
+						back.name = parenthesize(back.name);
+					}
+					back.name = ops[tag - OP_UNA] + back.name;
+					back.precedence = p;
+				}
+				break;
+			}
+
+			case OP_EXP:
+			case OP_MUL:
+			case OP_DIV:
+			case OP_MOD:
+			case OP_SHR:
+			case OP_SHL:
+			case OP_ADD:
+			case OP_SUB:
+			case OP_AND:
+			case OP_OR:
+			case OP_XOR:
+			case OP_EQ:
+			case OP_GT:
+			case OP_LT:
+			case OP_UGT:
+			case OP_ULT: {
+				static const pair ops[] = {
+					{ "**", 1 },
+					{ "*", 2 },
+					{ "/", 2 },
+					{ ".MOD.", 2 },
+					{ ">>", 2 },
+					{ "<<", 2 },
+					{ "+", 3 },
+					{ "-", 3 },
+					{ "&", 4 },
+					{ "|", 5 },
+					{ "^", 5 },
+					{ "=", 6 },
+					{ ">",  6},
+					{ "<",  6},
+					{ ".UGT.",  6},
+					{ ".ULT.", 6 }
+				};
+
+
+				p = ops[tag - OP_BIN].precedence;
+				if (stack.size() < 2) {
+					underflow = true;
+				} else {
+					pair b = std::move(stack.back());
+					stack.pop_back();
+					pair &a = stack.back();
+
+					if (p < b.precedence) b.name = parenthesize(b.name);
+					if (p < a.precedence) a.name = parenthesize(a.name);
+
+					a.name += ops[tag - OP_BIN].name + b.name;
+					a.precedence = p;
+				}
+				break;
+			}
+			default:
+				fprintf(stderr, "Unrecognized expression op %02x\n", tag);
+				break;
+		}
+
+	}
+	if (stack.size() == 1) {
+		fprintf(stderr, "Expression: %s\n", stack.front().name.c_str());
+	} else if (stack.empty() || underflow) {
+		fprintf(stderr, "Expression underflow error.\n");
+		fatal = true;
+	} else {
+		fprintf(stderr, "Expression overflow error.\n");
+		fatal = true;
+	}
+
+	if (fatal) flags._errors++;
+}
 
 
 
@@ -456,6 +594,7 @@ void one_module(const std::vector<uint8_t> &data,
 
 				data_ptr->insert(data_ptr->end(), e.size, 0);
 
+				int reduced_size = 0;
 				/**/
 				for(;;) {
 					op = read_8(iter);
@@ -463,11 +602,13 @@ void one_module(const std::vector<uint8_t> &data,
 
 					switch(op) {
 						case OP_VAL: {
+							reduced_size++;
 							uint32_t offset = read_32(iter);
 							e.stack.emplace_back(op, offset);
 							break;
 						}
 						case OP_SYM: {
+							reduced_size++;
 							uint16_t symbol = read_16(iter);
 							assert(symbol < local_symbols.size());
 							auto &s = local_symbols[symbol];
@@ -492,6 +633,7 @@ void one_module(const std::vector<uint8_t> &data,
 							break;
 						}
 						case OP_LOC: {
+							reduced_size++;
 							uint8_t section = read_8(iter);
 							uint32_t offset = read_32(iter);
 							int real_section = remap_section[section];
@@ -504,6 +646,8 @@ void one_module(const std::vector<uint8_t> &data,
 						case OP_NOT:
 						case OP_NEG:
 						case OP_FLP:
+							e.stack.emplace_back(op);
+							break;
 						// binary
 						case OP_EXP:
 						case OP_MUL:
@@ -521,11 +665,16 @@ void one_module(const std::vector<uint8_t> &data,
 						case OP_LT:
 						case OP_UGT:
 						case OP_ULT:
+							reduced_size--;
 							e.stack.emplace_back(op);
 							break;
 						default:
 							assert(!"unsupported expression opcode.");
 					}
+				}
+
+				if (reduced_size != 1) {
+					expr_error(true, e, "Malformed expression");
 				}
 				sections[current_section].expressions.emplace_back(std::move(e));
 				break;
@@ -675,98 +824,6 @@ void append(std::vector<T> &to, unsigned count, const T& value) {
 
 inline bool in_range(int value, int low, int high) {
 	return value >= low && value <= high;
-}
-
-inline void expr_error(bool fatal, const expression &e, const char *msg) {
-	warnx("%s:%04x %s", sections[e.section].name.c_str(), e.offset, msg);
-
-	// pretty-print the expression...
-	bool underflow = false;
-	std::vector<std::string> stack;
-	for (auto &x : e.stack) {
-		auto tag = x.tag;
-		switch(tag) {
-
-			case OP_VAL: {
-				char buffer[6];
-				snprintf(buffer, sizeof(buffer), "$%02x", x.value);
-				stack.emplace_back(buffer);
-				break;
-			}
-			case OP_SYM: {
-				stack.emplace_back(symbols[x.section].name);
-				break;
-			}
-			case OP_LOC: {
-				std::string tmp = sections[x.section].name;
-				if (x.value) {
-					char buffer[6];
-					snprintf(buffer, sizeof(buffer), "$%02x", x.value);
-					tmp.push_back('+');
-					tmp.append(buffer);
-				}
-				stack.emplace_back(std::move(tmp));
-				break;
-			}
-
-			case OP_NOT:
-			case OP_NEG:
-			case OP_FLP: {
-				static const std::string ops[] = {
-					".NOT.", "-", "\\"
-				};
-				if (stack.empty()) {
-					underflow = true;
-				} else {
-					stack.back() = ops[tag - OP_UNA] + stack.back();
-				}
-				break;
-			}
-
-			case OP_EXP:
-			case OP_MUL:
-			case OP_DIV:
-			case OP_MOD:
-			case OP_SHR:
-			case OP_SHL:
-			case OP_ADD:
-			case OP_SUB:
-			case OP_AND:
-			case OP_OR:
-			case OP_XOR:
-			case OP_EQ:
-			case OP_GT:
-			case OP_LT:
-			case OP_UGT:
-			case OP_ULT: {
-				static const std::string ops[] = {
-					"**", "*", "/", ".MOD.", ">>", "<<", "+", "-", "&", "|", "^", "=", ">", "<", ">", "<"
-				};
-
-				if (stack.size() < 2) {
-					underflow = true;
-				} else {
-					std::string tmp = std::move(stack.back());
-					stack.pop_back();
-					stack.back() += ops[tag - OP_BIN] + tmp;
-				}
-				break;
-			}
-			default:
-				fprintf(stderr, "Unrecognized expression op %02x\n", tag);
-				break;
-		}
-		if (stack.size() == 1) {
-			fprintf(stderr, "Expression: %s\n", stack.front().c_str());
-		} else if (stack.empty() || underflow) {
-			fprintf(stderr, "Expression underflow error.\n");
-			fatal = true;
-		} else {
-			fprintf(stderr, "Expression overflow error.\n");
-			fatal = true;
-		}
-	}
-	if (fatal) flags._errors++;
 }
 
 void to_omf(const expression &e, omf::segment &seg) {
