@@ -42,9 +42,9 @@ size_t write(int fd, void *buffer, size_t count) {
 	dcb.dataBuffer = buffer;
 	dcb.requestCount = count;
 	#asm
-	pea #$2012
 	pea #^%%dcb
 	pea #%%dcb
+	pea #$2012
 	jsl $e100b0
 	sta %%tool_error;
 	#endasm

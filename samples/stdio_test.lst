@@ -1,4 +1,4 @@
-  Tue Jan 17 2017 23:02                                                Page 1
+  Tue Jan 17 2017 23:13                                                Page 1
 
 
                      ***************************************
@@ -59,7 +59,7 @@
     50                        ;}
     51                        L4:
     52 00:003C: 2B           	pld
-  Tue Jan 17 2017 23:02                                                Page 2
+  Tue Jan 17 2017 23:13                                                Page 2
 
 
     53 00:003D: 3B           	tsc
@@ -120,7 +120,7 @@
    100                        ;}
    101             00000000   L6	equ	0
    102             00000001   L7	equ	1
-  Tue Jan 17 2017 23:02                                                Page 3
+  Tue Jan 17 2017 23:13                                                Page 3
 
 
    103                        	ends
@@ -181,7 +181,7 @@
    158 00:0086: A9 FF FF     	lda	#$ffff
    159                        L14:
    160 00:0089: A8           	tay
-  Tue Jan 17 2017 23:02                                                Page 4
+  Tue Jan 17 2017 23:13                                                Page 4
 
 
    161 00:008A: A5 02        	lda	<L12+2
@@ -242,7 +242,7 @@
    215                        ;	dcb.refNum = fd+1;
    216 00:00AE: A5 06        	lda	<L15+fd_0
    217 00:00B0: 1A           	ina
-  Tue Jan 17 2017 23:02                                                Page 5
+  Tue Jan 17 2017 23:13                                                Page 5
 
 
    218 00:00B1: 8D xx xx     	sta	|L10001+2
@@ -256,16 +256,16 @@
    226 00:00C0: 8D xx xx     	sta	|L10001+8
    227 00:00C3: 9C xx xx     	stz	|L10001+8+2
    228                        ;	#asm
-   229                        ;	pea #$2012
-   230                        ;	pea #^%%dcb
-   231                        ;	pea #%%dcb
+   229                        ;	pea #^%%dcb
+   230                        ;	pea #%%dcb
+   231                        ;	pea #$2012
    232                        ;	jsl $e100b0
    233                        ;	sta %%tool_error;
    234                        ;	#endasm
    235                        	asmstart
-   236 00:00C6: F4 12 20     	pea #$2012
-   237 00:00C9: F4 xx xx     	pea #^L10001
-   238 00:00CC: F4 xx xx     	pea #L10001
+   236 00:00C6: F4 xx xx     	pea #^L10001
+   237 00:00C9: F4 xx xx     	pea #L10001
+   238 00:00CC: F4 12 20     	pea #$2012
    239 00:00CF: 22 B0 00 E1  	jsl $e100b0
    240 00:00D3: 85 01        	sta <L16+tool_error_1;
    241                        	asmend
@@ -303,7 +303,7 @@
    273                        	xdef	~~lseek
    274                        	func
    275                        ~~lseek:
-  Tue Jan 17 2017 23:02                                                Page 6
+  Tue Jan 17 2017 23:13                                                Page 6
 
 
    276                        	longa	on
@@ -364,7 +364,7 @@
    331 00:0128: A5 01        	lda	<L22+1
    332 00:012A: 85 07        	sta	<L22+1+6
    333 00:012C: 2B           	pld
-  Tue Jan 17 2017 23:02                                                Page 7
+  Tue Jan 17 2017 23:13                                                Page 7
 
 
    334 00:012D: 3B           	tsc
@@ -425,7 +425,7 @@
    389 00:0153: 38           	sec
    390 00:0154: E9 00 00     	sbc	#L28
    391 00:0157: 1B           	tcs
-  Tue Jan 17 2017 23:02                                                Page 8
+  Tue Jan 17 2017 23:13                                                Page 8
 
 
    392 00:0158: 0B           	phd
