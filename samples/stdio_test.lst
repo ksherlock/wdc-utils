@@ -1,4 +1,4 @@
-  Tue Jan 17 2017 23:13                                                Page 1
+  Tue Jan 17 2017 23:24                                                Page 1
 
 
                      ***************************************
@@ -31,456 +31,468 @@
     22 00:0007: 5B           	tcd
     23                        ;	FILE *fp;
     24                        ;
-    25                        ;	fputs("hello, world\n", stdout);
+    25                        ;	#asm
     26             00000000   fp_1	set	0
-    27 00:0008: A9 xx xx     	lda	#<~~_iob+20
-    28 00:000B: 85 01        	sta	<R0
-    29                        	xref	_BEG_DATA
-    30 00:000D: A9 xx xx     	lda	#_BEG_DATA>>16
-    31 00:0010: 85 03        	sta	<R0+2
-    32 00:0012: D4 03        	pei	<R0+2
-    33 00:0014: D4 01        	pei	<R0
-    34 00:0016: F4 xx xx     	pea	#^L1
-    35 00:0019: F4 xx xx     	pea	#<L1
-    36 00:001C: 22 xx xx xx  	jsl	~~fputs
-    37                        ;
-    38                        ;	fp = fopen("file.txt", "wb");
-    39 00:0020: F4 xx xx     	pea	#^L1+23
-    40 00:0023: F4 xx xx     	pea	#<L1+23
-    41 00:0026: F4 xx xx     	pea	#^L1+14
-    42 00:0029: F4 xx xx     	pea	#<L1+14
-    43 00:002C: 22 xx xx xx  	jsl	~~fopen
-    44 00:0030: 85 05        	sta	<L3+fp_1
-    45 00:0032: 86 07        	stx	<L3+fp_1+2
-    46                        ;	fclose(fp);
-    47 00:0034: D4 07        	pei	<L3+fp_1+2
-    48 00:0036: D4 05        	pei	<L3+fp_1
-    49 00:0038: 22 xx xx xx  	jsl	~~fclose
-    50                        ;}
-    51                        L4:
-    52 00:003C: 2B           	pld
-  Tue Jan 17 2017 23:13                                                Page 2
+    27                        ;	phk
+    28                        ;	plb
+    29                        ;	#endasm
+    30                        	asmstart
+    31 00:0008: 4B           	phk
+    32 00:0009: AB           	plb
+    33                        	asmend
+    34                        ;
+    35                        ;	fputs("hello, world\n", stdout);
+    36 00:000A: A9 xx xx     	lda	#<~~_iob+20
+    37 00:000D: 85 01        	sta	<R0
+    38                        	xref	_BEG_DATA
+    39 00:000F: A9 xx xx     	lda	#_BEG_DATA>>16
+    40 00:0012: 85 03        	sta	<R0+2
+    41 00:0014: D4 03        	pei	<R0+2
+    42 00:0016: D4 01        	pei	<R0
+    43 00:0018: F4 xx xx     	pea	#^L1
+    44 00:001B: F4 xx xx     	pea	#<L1
+    45 00:001E: 22 xx xx xx  	jsl	~~fputs
+    46                        ;
+    47                        ;	fp = fopen("file.txt", "wb");
+    48 00:0022: F4 xx xx     	pea	#^L1+23
+    49 00:0025: F4 xx xx     	pea	#<L1+23
+    50 00:0028: F4 xx xx     	pea	#^L1+14
+    51 00:002B: F4 xx xx     	pea	#<L1+14
+    52 00:002E: 22 xx xx xx  	jsl	~~fopen
+  Tue Jan 17 2017 23:24                                                Page 2
 
 
-    53 00:003D: 3B           	tsc
-    54 00:003E: 18           	clc
-    55 00:003F: 69 08 00     	adc	#L2
-    56 00:0042: 1B           	tcs
-    57 00:0043: 6B           	rtl
-    58             00000008   L2	equ	8
-    59             00000005   L3	equ	5
-    60                        	ends
-    61                        	efunc
-    62                        	data
-    63                        L1:
-    64 00:0000: 68 65 6C 6C  	db	$68,$65,$6C,$6C,$6F,$2C,$20,$77,$6F,$72,
+    53 00:0032: 85 05        	sta	<L3+fp_1
+    54 00:0034: 86 07        	stx	<L3+fp_1+2
+    55                        ;	fclose(fp);
+    56 00:0036: D4 07        	pei	<L3+fp_1+2
+    57 00:0038: D4 05        	pei	<L3+fp_1
+    58 00:003A: 22 xx xx xx  	jsl	~~fclose
+    59                        ;}
+    60                        L4:
+    61 00:003E: 2B           	pld
+    62 00:003F: 3B           	tsc
+    63 00:0040: 18           	clc
+    64 00:0041: 69 08 00     	adc	#L2
+    65 00:0044: 1B           	tcs
+    66 00:0045: 6B           	rtl
+    67             00000008   L2	equ	8
+    68             00000005   L3	equ	5
+    69                        	ends
+    70                        	efunc
+    71                        	data
+    72                        L1:
+    73 00:0000: 68 65 6C 6C  	db	$68,$65,$6C,$6C,$6F,$2C,$20,$77,$6F,$72,
                     $6C,$64,$0A,$00,$66
        00:0004: 6F 2C 20 77 
        00:0008: 6F 72 6C 64 
        00:000C: 0A 00 66 
-    65 00:000F: 69 6C 65 2E  	db	$69,$6C,$65,$2E,$74,$78,$74,$00,$77,$62,
+    74 00:000F: 69 6C 65 2E  	db	$69,$6C,$65,$2E,$74,$78,$74,$00,$77,$62,
                     $00
        00:0013: 74 78 74 00 
        00:0017: 77 62 00 
-    66 00:001A:              	ends
-    67                        ;
-    68                        ;// these stubs are not provided in the library bu
+    75 00:001A:              	ends
+    76                        ;
+    77                        ;// these stubs are not provided in the library bu
                     t could call gs/os.
-    69                        ;
-    70                        ;int open(const char *name, int mode) {
-    71                        	code
-    72                        	xdef	~~open
-    73                        	func
-    74                        ~~open:
-    75                        	longa	on
-    76                        	longi	on
-    77 00:0044: 3B           	tsc
-    78 00:0045: 38           	sec
-    79 00:0046: E9 00 00     	sbc	#L6
-    80 00:0049: 1B           	tcs
-    81 00:004A: 0B           	phd
-    82 00:004B: 5B           	tcd
-    83             00000004   name_0	set	4
-    84             00000008   mode_0	set	8
-    85                        ;	return -1;
-    86 00:004C: A9 FF FF     	lda	#$ffff
-    87                        L8:
-    88 00:004F: A8           	tay
-    89 00:0050: A5 02        	lda	<L6+2
-    90 00:0052: 85 08        	sta	<L6+2+6
-    91 00:0054: A5 01        	lda	<L6+1
-    92 00:0056: 85 07        	sta	<L6+1+6
-    93 00:0058: 2B           	pld
-    94 00:0059: 3B           	tsc
-    95 00:005A: 18           	clc
-    96 00:005B: 69 06 00     	adc	#L6+6
-    97 00:005E: 1B           	tcs
-    98 00:005F: 98           	tya
-    99 00:0060: 6B           	rtl
-   100                        ;}
-   101             00000000   L6	equ	0
-   102             00000001   L7	equ	1
-  Tue Jan 17 2017 23:13                                                Page 3
+    78                        ;
+    79                        ;int open(const char *name, int mode) {
+    80                        	code
+    81                        	xdef	~~open
+    82                        	func
+    83                        ~~open:
+    84                        	longa	on
+    85                        	longi	on
+    86 00:0046: 3B           	tsc
+    87 00:0047: 38           	sec
+    88 00:0048: E9 00 00     	sbc	#L6
+    89 00:004B: 1B           	tcs
+    90 00:004C: 0B           	phd
+    91 00:004D: 5B           	tcd
+    92             00000004   name_0	set	4
+    93             00000008   mode_0	set	8
+    94                        ;	return -1;
+    95 00:004E: A9 FF FF     	lda	#$ffff
+    96                        L8:
+    97 00:0051: A8           	tay
+    98 00:0052: A5 02        	lda	<L6+2
+    99 00:0054: 85 08        	sta	<L6+2+6
+   100 00:0056: A5 01        	lda	<L6+1
+   101 00:0058: 85 07        	sta	<L6+1+6
+   102 00:005A: 2B           	pld
+  Tue Jan 17 2017 23:24                                                Page 3
 
 
-   103                        	ends
-   104                        	efunc
-   105                        ;
-   106                        ;int close(int fd) {
-   107                        	code
-   108                        	xdef	~~close
-   109                        	func
-   110                        ~~close:
-   111                        	longa	on
-   112                        	longi	on
-   113 00:0061: 3B           	tsc
-   114 00:0062: 38           	sec
-   115 00:0063: E9 00 00     	sbc	#L9
-   116 00:0066: 1B           	tcs
-   117 00:0067: 0B           	phd
-   118 00:0068: 5B           	tcd
-   119             00000004   fd_0	set	4
-   120                        ;	return -1;
-   121 00:0069: A9 FF FF     	lda	#$ffff
-   122                        L11:
-   123 00:006C: A8           	tay
-   124 00:006D: A5 02        	lda	<L9+2
-   125 00:006F: 85 04        	sta	<L9+2+2
-   126 00:0071: A5 01        	lda	<L9+1
-   127 00:0073: 85 03        	sta	<L9+1+2
-   128 00:0075: 2B           	pld
-   129 00:0076: 3B           	tsc
-   130 00:0077: 18           	clc
-   131 00:0078: 69 02 00     	adc	#L9+2
-   132 00:007B: 1B           	tcs
-   133 00:007C: 98           	tya
-   134 00:007D: 6B           	rtl
-   135                        ;}
-   136             00000000   L9	equ	0
-   137             00000001   L10	equ	1
-   138                        	ends
-   139                        	efunc
-   140                        ;
-   141                        ;size_t read(int fd, void *buffer, size_t count) {
-   142                        	code
-   143                        	xdef	~~read
-   144                        	func
-   145                        ~~read:
-   146                        	longa	on
-   147                        	longi	on
-   148 00:007E: 3B           	tsc
-   149 00:007F: 38           	sec
-   150 00:0080: E9 00 00     	sbc	#L12
-   151 00:0083: 1B           	tcs
-   152 00:0084: 0B           	phd
-   153 00:0085: 5B           	tcd
-   154             00000004   fd_0	set	4
-   155             00000006   buffer_0	set	6
-   156             0000000A   count_0	set	10
-   157                        ;	return -1;
-   158 00:0086: A9 FF FF     	lda	#$ffff
-   159                        L14:
-   160 00:0089: A8           	tay
-  Tue Jan 17 2017 23:13                                                Page 4
+   103 00:005B: 3B           	tsc
+   104 00:005C: 18           	clc
+   105 00:005D: 69 06 00     	adc	#L6+6
+   106 00:0060: 1B           	tcs
+   107 00:0061: 98           	tya
+   108 00:0062: 6B           	rtl
+   109                        ;}
+   110             00000000   L6	equ	0
+   111             00000001   L7	equ	1
+   112                        	ends
+   113                        	efunc
+   114                        ;
+   115                        ;int close(int fd) {
+   116                        	code
+   117                        	xdef	~~close
+   118                        	func
+   119                        ~~close:
+   120                        	longa	on
+   121                        	longi	on
+   122 00:0063: 3B           	tsc
+   123 00:0064: 38           	sec
+   124 00:0065: E9 00 00     	sbc	#L9
+   125 00:0068: 1B           	tcs
+   126 00:0069: 0B           	phd
+   127 00:006A: 5B           	tcd
+   128             00000004   fd_0	set	4
+   129                        ;	return -1;
+   130 00:006B: A9 FF FF     	lda	#$ffff
+   131                        L11:
+   132 00:006E: A8           	tay
+   133 00:006F: A5 02        	lda	<L9+2
+   134 00:0071: 85 04        	sta	<L9+2+2
+   135 00:0073: A5 01        	lda	<L9+1
+   136 00:0075: 85 03        	sta	<L9+1+2
+   137 00:0077: 2B           	pld
+   138 00:0078: 3B           	tsc
+   139 00:0079: 18           	clc
+   140 00:007A: 69 02 00     	adc	#L9+2
+   141 00:007D: 1B           	tcs
+   142 00:007E: 98           	tya
+   143 00:007F: 6B           	rtl
+   144                        ;}
+   145             00000000   L9	equ	0
+   146             00000001   L10	equ	1
+   147                        	ends
+   148                        	efunc
+   149                        ;
+   150                        ;size_t read(int fd, void *buffer, size_t count) {
+   151                        	code
+   152                        	xdef	~~read
+   153                        	func
+   154                        ~~read:
+   155                        	longa	on
+   156                        	longi	on
+   157 00:0080: 3B           	tsc
+   158 00:0081: 38           	sec
+   159 00:0082: E9 00 00     	sbc	#L12
+   160 00:0085: 1B           	tcs
+  Tue Jan 17 2017 23:24                                                Page 4
 
 
-   161 00:008A: A5 02        	lda	<L12+2
-   162 00:008C: 85 0A        	sta	<L12+2+8
-   163 00:008E: A5 01        	lda	<L12+1
-   164 00:0090: 85 09        	sta	<L12+1+8
-   165 00:0092: 2B           	pld
-   166 00:0093: 3B           	tsc
-   167 00:0094: 18           	clc
-   168 00:0095: 69 08 00     	adc	#L12+8
-   169 00:0098: 1B           	tcs
-   170 00:0099: 98           	tya
-   171 00:009A: 6B           	rtl
-   172                        ;}
-   173             00000000   L12	equ	0
-   174             00000001   L13	equ	1
-   175                        	ends
-   176                        	efunc
-   177                        ;
-   178                        ;size_t write(int fd, void *buffer, size_t count) 
+   161 00:0086: 0B           	phd
+   162 00:0087: 5B           	tcd
+   163             00000004   fd_0	set	4
+   164             00000006   buffer_0	set	6
+   165             0000000A   count_0	set	10
+   166                        ;	return -1;
+   167 00:0088: A9 FF FF     	lda	#$ffff
+   168                        L14:
+   169 00:008B: A8           	tay
+   170 00:008C: A5 02        	lda	<L12+2
+   171 00:008E: 85 0A        	sta	<L12+2+8
+   172 00:0090: A5 01        	lda	<L12+1
+   173 00:0092: 85 09        	sta	<L12+1+8
+   174 00:0094: 2B           	pld
+   175 00:0095: 3B           	tsc
+   176 00:0096: 18           	clc
+   177 00:0097: 69 08 00     	adc	#L12+8
+   178 00:009A: 1B           	tcs
+   179 00:009B: 98           	tya
+   180 00:009C: 6B           	rtl
+   181                        ;}
+   182             00000000   L12	equ	0
+   183             00000001   L13	equ	1
+   184                        	ends
+   185                        	efunc
+   186                        ;
+   187                        ;size_t write(int fd, void *buffer, size_t count) 
                     {
-   179                        	code
-   180                        	xdef	~~write
-   181                        	func
-   182                        ~~write:
-   183                        	longa	on
-   184                        	longi	on
-   185 00:009B: 3B           	tsc
-   186 00:009C: 38           	sec
-   187 00:009D: E9 02 00     	sbc	#L15
-   188 00:00A0: 1B           	tcs
-   189 00:00A1: 0B           	phd
-   190 00:00A2: 5B           	tcd
-   191             00000004   fd_0	set	4
-   192             00000006   buffer_0	set	6
-   193             0000000A   count_0	set	10
-   194                        ;	static struct {
-   195                        ;		unsigned pCount;
-   196                        ;		unsigned refNum;
-   197                        ;		void *dataBuffer;
-   198                        ;		unsigned long requestCount;
-   199                        ;		unsigned long transferCount;
-   200                        ;		unsigned cachePriority;
-   201                        ;	} dcb;
-   202                        	udata
-   203                        L10001:
-   204 00:0000:              	ds	18
-   205 00:0012:              	ends
-   206                        ;
-   207                        ;	unsigned tool_error = 0x0043;
-   208                        ;
-   209                        ;	dcb.pCount = 4;
-   210             00000000   tool_error_1	set	0
-   211 00:00A3: A9 43 00     	lda	#$43
-   212 00:00A6: 85 01        	sta	<L16+tool_error_1
-   213 00:00A8: A9 04 00     	lda	#$4
-   214 00:00AB: 8D xx xx     	sta	|L10001
-   215                        ;	dcb.refNum = fd+1;
-   216 00:00AE: A5 06        	lda	<L15+fd_0
-   217 00:00B0: 1A           	ina
-  Tue Jan 17 2017 23:13                                                Page 5
+   188                        	code
+   189                        	xdef	~~write
+   190                        	func
+   191                        ~~write:
+   192                        	longa	on
+   193                        	longi	on
+   194 00:009D: 3B           	tsc
+   195 00:009E: 38           	sec
+   196 00:009F: E9 02 00     	sbc	#L15
+   197 00:00A2: 1B           	tcs
+   198 00:00A3: 0B           	phd
+   199 00:00A4: 5B           	tcd
+   200             00000004   fd_0	set	4
+   201             00000006   buffer_0	set	6
+   202             0000000A   count_0	set	10
+   203                        ;	static struct {
+   204                        ;		unsigned pCount;
+   205                        ;		unsigned refNum;
+   206                        ;		void *dataBuffer;
+   207                        ;		unsigned long requestCount;
+   208                        ;		unsigned long transferCount;
+   209                        ;		unsigned cachePriority;
+   210                        ;	} dcb;
+   211                        	udata
+   212                        L10001:
+   213 00:0000:              	ds	18
+   214 00:0012:              	ends
+   215                        ;
+   216                        ;	unsigned tool_error = 0x0043;
+   217                        ;
+  Tue Jan 17 2017 23:24                                                Page 5
 
 
-   218 00:00B1: 8D xx xx     	sta	|L10001+2
-   219                        ;	dcb.dataBuffer = buffer;
-   220 00:00B4: A5 08        	lda	<L15+buffer_0
-   221 00:00B6: 8D xx xx     	sta	|L10001+4
-   222 00:00B9: A5 0A        	lda	<L15+buffer_0+2
-   223 00:00BB: 8D xx xx     	sta	|L10001+4+2
-   224                        ;	dcb.requestCount = count;
-   225 00:00BE: A5 0C        	lda	<L15+count_0
-   226 00:00C0: 8D xx xx     	sta	|L10001+8
-   227 00:00C3: 9C xx xx     	stz	|L10001+8+2
-   228                        ;	#asm
-   229                        ;	pea #^%%dcb
-   230                        ;	pea #%%dcb
-   231                        ;	pea #$2012
-   232                        ;	jsl $e100b0
-   233                        ;	sta %%tool_error;
-   234                        ;	#endasm
-   235                        	asmstart
-   236 00:00C6: F4 xx xx     	pea #^L10001
-   237 00:00C9: F4 xx xx     	pea #L10001
-   238 00:00CC: F4 12 20     	pea #$2012
-   239 00:00CF: 22 B0 00 E1  	jsl $e100b0
-   240 00:00D3: 85 01        	sta <L16+tool_error_1;
-   241                        	asmend
-   242                        ;	if (tool_error) return -1;
-   243 00:00D5: A5 01        	lda	<L16+tool_error_1
-   244 00:00D7: D0 03        	bne	L17
-   245 00:00D9: 82 15 00     	brl	L10002
-   246                        L17:
-   247 00:00DC: A9 FF FF     	lda	#$ffff
-   248                        L18:
-   249 00:00DF: A8           	tay
-   250 00:00E0: A5 04        	lda	<L15+2
-   251 00:00E2: 85 0C        	sta	<L15+2+8
-   252 00:00E4: A5 03        	lda	<L15+1
-   253 00:00E6: 85 0B        	sta	<L15+1+8
-   254 00:00E8: 2B           	pld
-   255 00:00E9: 3B           	tsc
-   256 00:00EA: 18           	clc
-   257 00:00EB: 69 0A 00     	adc	#L15+8
-   258 00:00EE: 1B           	tcs
-   259 00:00EF: 98           	tya
-   260 00:00F0: 6B           	rtl
-   261                        ;	return dcb.transferCount;
-   262                        L10002:
-   263 00:00F1: AD xx xx     	lda	|L10001+12
-   264 00:00F4: 82 E8 FF     	brl	L18
-   265                        ;}
-   266             00000002   L15	equ	2
-   267             00000001   L16	equ	1
-   268                        	ends
-   269                        	efunc
-   270                        ;
-   271                        ;long lseek(int fd, long offset, int whence) {
-   272                        	code
-   273                        	xdef	~~lseek
-   274                        	func
-   275                        ~~lseek:
-  Tue Jan 17 2017 23:13                                                Page 6
+   218                        ;	dcb.pCount = 4;
+   219             00000000   tool_error_1	set	0
+   220 00:00A5: A9 43 00     	lda	#$43
+   221 00:00A8: 85 01        	sta	<L16+tool_error_1
+   222 00:00AA: A9 04 00     	lda	#$4
+   223 00:00AD: 8D xx xx     	sta	|L10001
+   224                        ;	dcb.refNum = fd+1;
+   225 00:00B0: A5 06        	lda	<L15+fd_0
+   226 00:00B2: 1A           	ina
+   227 00:00B3: 8D xx xx     	sta	|L10001+2
+   228                        ;	dcb.dataBuffer = buffer;
+   229 00:00B6: A5 08        	lda	<L15+buffer_0
+   230 00:00B8: 8D xx xx     	sta	|L10001+4
+   231 00:00BB: A5 0A        	lda	<L15+buffer_0+2
+   232 00:00BD: 8D xx xx     	sta	|L10001+4+2
+   233                        ;	dcb.requestCount = count;
+   234 00:00C0: A5 0C        	lda	<L15+count_0
+   235 00:00C2: 8D xx xx     	sta	|L10001+8
+   236 00:00C5: 9C xx xx     	stz	|L10001+8+2
+   237                        ;	#asm
+   238                        ;	pea #^%%dcb
+   239                        ;	pea #%%dcb
+   240                        ;	pea #$2012
+   241                        ;	jsl $e100b0
+   242                        ;	sta %%tool_error;
+   243                        ;	#endasm
+   244                        	asmstart
+   245 00:00C8: F4 xx xx     	pea #^L10001
+   246 00:00CB: F4 xx xx     	pea #L10001
+   247 00:00CE: F4 12 20     	pea #$2012
+   248 00:00D1: 22 B0 00 E1  	jsl $e100b0
+   249 00:00D5: 85 01        	sta <L16+tool_error_1;
+   250                        	asmend
+   251                        ;	if (tool_error) return -1;
+   252 00:00D7: A5 01        	lda	<L16+tool_error_1
+   253 00:00D9: D0 03        	bne	L17
+   254 00:00DB: 82 15 00     	brl	L10002
+   255                        L17:
+   256 00:00DE: A9 FF FF     	lda	#$ffff
+   257                        L18:
+   258 00:00E1: A8           	tay
+   259 00:00E2: A5 04        	lda	<L15+2
+   260 00:00E4: 85 0C        	sta	<L15+2+8
+   261 00:00E6: A5 03        	lda	<L15+1
+   262 00:00E8: 85 0B        	sta	<L15+1+8
+   263 00:00EA: 2B           	pld
+   264 00:00EB: 3B           	tsc
+   265 00:00EC: 18           	clc
+   266 00:00ED: 69 0A 00     	adc	#L15+8
+   267 00:00F0: 1B           	tcs
+   268 00:00F1: 98           	tya
+   269 00:00F2: 6B           	rtl
+   270                        ;	return dcb.transferCount;
+   271                        L10002:
+   272 00:00F3: AD xx xx     	lda	|L10001+12
+   273 00:00F6: 82 E8 FF     	brl	L18
+   274                        ;}
+   275             00000002   L15	equ	2
+  Tue Jan 17 2017 23:24                                                Page 6
 
 
-   276                        	longa	on
-   277                        	longi	on
-   278 00:00F7: 3B           	tsc
-   279 00:00F8: 38           	sec
-   280 00:00F9: E9 00 00     	sbc	#L19
-   281 00:00FC: 1B           	tcs
-   282 00:00FD: 0B           	phd
-   283 00:00FE: 5B           	tcd
-   284             00000004   fd_0	set	4
-   285             00000006   offset_0	set	6
-   286             0000000A   whence_0	set	10
-   287                        ;	return -1;
-   288 00:00FF: A9 FF FF     	lda	#$ffff
-   289 00:0102: AA           	tax
-   290 00:0103: A9 FF FF     	lda	#$ffff
-   291                        L21:
-   292 00:0106: A8           	tay
-   293 00:0107: A5 02        	lda	<L19+2
-   294 00:0109: 85 0A        	sta	<L19+2+8
-   295 00:010B: A5 01        	lda	<L19+1
-   296 00:010D: 85 09        	sta	<L19+1+8
-   297 00:010F: 2B           	pld
-   298 00:0110: 3B           	tsc
-   299 00:0111: 18           	clc
-   300 00:0112: 69 08 00     	adc	#L19+8
-   301 00:0115: 1B           	tcs
-   302 00:0116: 98           	tya
-   303 00:0117: 6B           	rtl
-   304                        ;}
-   305             00000000   L19	equ	0
-   306             00000001   L20	equ	1
-   307                        	ends
-   308                        	efunc
-   309                        ;
-   310                        ;int creat(const char *name, int mode) {
-   311                        	code
-   312                        	xdef	~~creat
-   313                        	func
-   314                        ~~creat:
-   315                        	longa	on
-   316                        	longi	on
-   317 00:0118: 3B           	tsc
-   318 00:0119: 38           	sec
-   319 00:011A: E9 00 00     	sbc	#L22
-   320 00:011D: 1B           	tcs
-   321 00:011E: 0B           	phd
-   322 00:011F: 5B           	tcd
-   323             00000004   name_0	set	4
-   324             00000008   mode_0	set	8
-   325                        ;	return -1;
-   326 00:0120: A9 FF FF     	lda	#$ffff
-   327                        L24:
-   328 00:0123: A8           	tay
-   329 00:0124: A5 02        	lda	<L22+2
-   330 00:0126: 85 08        	sta	<L22+2+6
-   331 00:0128: A5 01        	lda	<L22+1
-   332 00:012A: 85 07        	sta	<L22+1+6
-   333 00:012C: 2B           	pld
-  Tue Jan 17 2017 23:13                                                Page 7
+   276             00000001   L16	equ	1
+   277                        	ends
+   278                        	efunc
+   279                        ;
+   280                        ;long lseek(int fd, long offset, int whence) {
+   281                        	code
+   282                        	xdef	~~lseek
+   283                        	func
+   284                        ~~lseek:
+   285                        	longa	on
+   286                        	longi	on
+   287 00:00F9: 3B           	tsc
+   288 00:00FA: 38           	sec
+   289 00:00FB: E9 00 00     	sbc	#L19
+   290 00:00FE: 1B           	tcs
+   291 00:00FF: 0B           	phd
+   292 00:0100: 5B           	tcd
+   293             00000004   fd_0	set	4
+   294             00000006   offset_0	set	6
+   295             0000000A   whence_0	set	10
+   296                        ;	return -1;
+   297 00:0101: A9 FF FF     	lda	#$ffff
+   298 00:0104: AA           	tax
+   299 00:0105: A9 FF FF     	lda	#$ffff
+   300                        L21:
+   301 00:0108: A8           	tay
+   302 00:0109: A5 02        	lda	<L19+2
+   303 00:010B: 85 0A        	sta	<L19+2+8
+   304 00:010D: A5 01        	lda	<L19+1
+   305 00:010F: 85 09        	sta	<L19+1+8
+   306 00:0111: 2B           	pld
+   307 00:0112: 3B           	tsc
+   308 00:0113: 18           	clc
+   309 00:0114: 69 08 00     	adc	#L19+8
+   310 00:0117: 1B           	tcs
+   311 00:0118: 98           	tya
+   312 00:0119: 6B           	rtl
+   313                        ;}
+   314             00000000   L19	equ	0
+   315             00000001   L20	equ	1
+   316                        	ends
+   317                        	efunc
+   318                        ;
+   319                        ;int creat(const char *name, int mode) {
+   320                        	code
+   321                        	xdef	~~creat
+   322                        	func
+   323                        ~~creat:
+   324                        	longa	on
+   325                        	longi	on
+   326 00:011A: 3B           	tsc
+   327 00:011B: 38           	sec
+   328 00:011C: E9 00 00     	sbc	#L22
+   329 00:011F: 1B           	tcs
+   330 00:0120: 0B           	phd
+   331 00:0121: 5B           	tcd
+   332             00000004   name_0	set	4
+   333             00000008   mode_0	set	8
+  Tue Jan 17 2017 23:24                                                Page 7
 
 
-   334 00:012D: 3B           	tsc
-   335 00:012E: 18           	clc
-   336 00:012F: 69 06 00     	adc	#L22+6
-   337 00:0132: 1B           	tcs
-   338 00:0133: 98           	tya
-   339 00:0134: 6B           	rtl
-   340                        ;}
-   341             00000000   L22	equ	0
-   342             00000001   L23	equ	1
-   343                        	ends
-   344                        	efunc
-   345                        ;
-   346                        ;int unlink(const char *name) {
-   347                        	code
-   348                        	xdef	~~unlink
-   349                        	func
-   350                        ~~unlink:
-   351                        	longa	on
-   352                        	longi	on
-   353 00:0135: 3B           	tsc
-   354 00:0136: 38           	sec
-   355 00:0137: E9 00 00     	sbc	#L25
-   356 00:013A: 1B           	tcs
-   357 00:013B: 0B           	phd
-   358 00:013C: 5B           	tcd
-   359             00000004   name_0	set	4
-   360                        ;	return -1;
-   361 00:013D: A9 FF FF     	lda	#$ffff
-   362                        L27:
-   363 00:0140: A8           	tay
-   364 00:0141: A5 02        	lda	<L25+2
-   365 00:0143: 85 06        	sta	<L25+2+4
-   366 00:0145: A5 01        	lda	<L25+1
-   367 00:0147: 85 05        	sta	<L25+1+4
-   368 00:0149: 2B           	pld
-   369 00:014A: 3B           	tsc
-   370 00:014B: 18           	clc
-   371 00:014C: 69 04 00     	adc	#L25+4
-   372 00:014F: 1B           	tcs
-   373 00:0150: 98           	tya
-   374 00:0151: 6B           	rtl
-   375                        ;}
-   376             00000000   L25	equ	0
-   377             00000001   L26	equ	1
-   378                        	ends
-   379                        	efunc
-   380                        ;
-   381                        ;int isatty(int fd) {
-   382                        	code
-   383                        	xdef	~~isatty
-   384                        	func
-   385                        ~~isatty:
-   386                        	longa	on
-   387                        	longi	on
-   388 00:0152: 3B           	tsc
-   389 00:0153: 38           	sec
-   390 00:0154: E9 00 00     	sbc	#L28
-   391 00:0157: 1B           	tcs
-  Tue Jan 17 2017 23:13                                                Page 8
+   334                        ;	return -1;
+   335 00:0122: A9 FF FF     	lda	#$ffff
+   336                        L24:
+   337 00:0125: A8           	tay
+   338 00:0126: A5 02        	lda	<L22+2
+   339 00:0128: 85 08        	sta	<L22+2+6
+   340 00:012A: A5 01        	lda	<L22+1
+   341 00:012C: 85 07        	sta	<L22+1+6
+   342 00:012E: 2B           	pld
+   343 00:012F: 3B           	tsc
+   344 00:0130: 18           	clc
+   345 00:0131: 69 06 00     	adc	#L22+6
+   346 00:0134: 1B           	tcs
+   347 00:0135: 98           	tya
+   348 00:0136: 6B           	rtl
+   349                        ;}
+   350             00000000   L22	equ	0
+   351             00000001   L23	equ	1
+   352                        	ends
+   353                        	efunc
+   354                        ;
+   355                        ;int unlink(const char *name) {
+   356                        	code
+   357                        	xdef	~~unlink
+   358                        	func
+   359                        ~~unlink:
+   360                        	longa	on
+   361                        	longi	on
+   362 00:0137: 3B           	tsc
+   363 00:0138: 38           	sec
+   364 00:0139: E9 00 00     	sbc	#L25
+   365 00:013C: 1B           	tcs
+   366 00:013D: 0B           	phd
+   367 00:013E: 5B           	tcd
+   368             00000004   name_0	set	4
+   369                        ;	return -1;
+   370 00:013F: A9 FF FF     	lda	#$ffff
+   371                        L27:
+   372 00:0142: A8           	tay
+   373 00:0143: A5 02        	lda	<L25+2
+   374 00:0145: 85 06        	sta	<L25+2+4
+   375 00:0147: A5 01        	lda	<L25+1
+   376 00:0149: 85 05        	sta	<L25+1+4
+   377 00:014B: 2B           	pld
+   378 00:014C: 3B           	tsc
+   379 00:014D: 18           	clc
+   380 00:014E: 69 04 00     	adc	#L25+4
+   381 00:0151: 1B           	tcs
+   382 00:0152: 98           	tya
+   383 00:0153: 6B           	rtl
+   384                        ;}
+   385             00000000   L25	equ	0
+   386             00000001   L26	equ	1
+   387                        	ends
+   388                        	efunc
+   389                        ;
+   390                        ;int isatty(int fd) {
+   391                        	code
+  Tue Jan 17 2017 23:24                                                Page 8
 
 
-   392 00:0158: 0B           	phd
-   393 00:0159: 5B           	tcd
-   394             00000004   fd_0	set	4
-   395                        ;	return -1;
-   396 00:015A: A9 FF FF     	lda	#$ffff
-   397                        L30:
-   398 00:015D: A8           	tay
-   399 00:015E: A5 02        	lda	<L28+2
-   400 00:0160: 85 04        	sta	<L28+2+2
-   401 00:0162: A5 01        	lda	<L28+1
-   402 00:0164: 85 03        	sta	<L28+1+2
-   403 00:0166: 2B           	pld
-   404 00:0167: 3B           	tsc
-   405 00:0168: 18           	clc
-   406 00:0169: 69 02 00     	adc	#L28+2
-   407 00:016C: 1B           	tcs
-   408 00:016D: 98           	tya
-   409 00:016E: 6B           	rtl
-   410                        ;}
-   411             00000000   L28	equ	0
-   412             00000001   L29	equ	1
-   413                        	ends
-   414                        	efunc
-   415                        ;
-   416                        ;
-   417                        ;#pragma section udata=heap
-   418                        heap	section
-   419 00:0000:              	ends
-   420                        ;char __heap[8192];
-   421                        ;void *heap_start = (void *)__heap;
-   422                        	data
-   423                        	xdef	~~heap_start
-   424                        ~~heap_start:
-   425 00:001A: xx xx xx xx  	dl	~~__heap
-   426 00:001E:              	ends
-   427                        ;void *heap_end = (void *)&__heap[8092];
-   428                        	data
-   429                        	xdef	~~heap_end
-   430                        ~~heap_end:
-   431 00:001E: xx xx xx xx  	dl	~~__heap+8092
-   432 00:0022:              	ends
-   433                        ;
-   434                        	xref	~~fputs
-   435                        	xref	~~fopen
-   436                        	xref	~~fclose
-   437                        	heap
-   438                        	xdef	~~__heap
-   439                        ~~__heap
-   440 00:0000:              	ds	8192
-   441 00:2000:              	ends
-   442                        	xref	~~_iob
-   443                        	end
+   392                        	xdef	~~isatty
+   393                        	func
+   394                        ~~isatty:
+   395                        	longa	on
+   396                        	longi	on
+   397 00:0154: 3B           	tsc
+   398 00:0155: 38           	sec
+   399 00:0156: E9 00 00     	sbc	#L28
+   400 00:0159: 1B           	tcs
+   401 00:015A: 0B           	phd
+   402 00:015B: 5B           	tcd
+   403             00000004   fd_0	set	4
+   404                        ;	return -1;
+   405 00:015C: A9 FF FF     	lda	#$ffff
+   406                        L30:
+   407 00:015F: A8           	tay
+   408 00:0160: A5 02        	lda	<L28+2
+   409 00:0162: 85 04        	sta	<L28+2+2
+   410 00:0164: A5 01        	lda	<L28+1
+   411 00:0166: 85 03        	sta	<L28+1+2
+   412 00:0168: 2B           	pld
+   413 00:0169: 3B           	tsc
+   414 00:016A: 18           	clc
+   415 00:016B: 69 02 00     	adc	#L28+2
+   416 00:016E: 1B           	tcs
+   417 00:016F: 98           	tya
+   418 00:0170: 6B           	rtl
+   419                        ;}
+   420             00000000   L28	equ	0
+   421             00000001   L29	equ	1
+   422                        	ends
+   423                        	efunc
+   424                        ;
+   425                        ;
+   426                        ;#pragma section udata=heap
+   427                        heap	section
+   428 00:0000:              	ends
+   429                        ;char __heap[8192];
+   430                        ;void *heap_start = (void *)__heap;
+   431                        	data
+   432                        	xdef	~~heap_start
+   433                        ~~heap_start:
+   434 00:001A: xx xx xx xx  	dl	~~__heap
+   435 00:001E:              	ends
+   436                        ;void *heap_end = (void *)&__heap[8092];
+   437                        	data
+   438                        	xdef	~~heap_end
+   439                        ~~heap_end:
+   440 00:001E: xx xx xx xx  	dl	~~__heap+8092
+   441 00:0022:              	ends
+   442                        ;
+   443                        	xref	~~fputs
+   444                        	xref	~~fopen
+   445                        	xref	~~fclose
+   446                        	heap
+   447                        	xdef	~~__heap
+   448                        ~~__heap
+   449 00:0000:              	ds	8192
+  Tue Jan 17 2017 23:24                                                Page 9
 
 
-      Lines assembled: 443
+   450 00:2000:              	ends
+   451                        	xref	~~_iob
+   452                        	end
+
+
+      Lines assembled: 452
       Errors: 0

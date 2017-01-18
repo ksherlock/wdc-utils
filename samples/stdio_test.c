@@ -5,6 +5,11 @@
 void main(void) {
 	FILE *fp;
 
+	#asm
+	phk
+	plb
+	#endasm
+
 	fputs("hello, world\n", stdout);
 
 	fp = fopen("file.txt", "wb");
