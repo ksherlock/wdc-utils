@@ -91,10 +91,10 @@ void zrdz_disassembler::front_matter(const std::string &module) {
 		if ((e.flags & SEC_REF_ONLY) == 0) continue;
 		if (e.size == 0 && e.symbols.empty()) continue;
 
-		e.processed = true;
 		print_section(e);
 		print_globals(e.number);
 		print_equs(e.number);
+		e.processed = true;
 
 		if (e.org) emit("", ".org", to_x(e.org, 4, '$'));
 		uint32_t pc = e.org;
