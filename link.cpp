@@ -1359,6 +1359,33 @@ enum {
 	kProcessed = 2,
 };
 
+
+/*
+ * observation: the library symbol size will far exceed the missing symbols size.
+ * Therefore, library symbols should be an unordered_map and explicitely look up
+ * each undefined symbol.
+ *
+ * output c is a map (and thus sorted) to guarantee reproducable builds.
+ * (could use a vector then sort/unique it...)
+ */
+bool intersection(const std::unordered_map<std::string, uint32_t> &a,
+	const std::set<std::string> &b, 
+	std::map<uint32_t, int> &c)
+{
+	bool rv = false;
+
+	for (const auto &name : b) {
+		auto iter = a.find(name);
+		if (iter == a.end()) continue;
+		rv = true;
+		c.emplace(iter->second, kPending);		
+	}
+
+	return rv;
+}
+
+
+#if 0
 bool intersection(const std::map<std::string, uint32_t> &a,
 	const std::set<std::string> &b, 
 	std::map<uint32_t, int> &c)
@@ -1386,6 +1413,7 @@ bool intersection(const std::map<std::string, uint32_t> &a,
 
 	return rv;
 }
+#endif
 
 
 bool one_lib(const std::string &path) {
@@ -1452,7 +1480,7 @@ bool one_lib(const std::string &path) {
 		//iter += size; // don't care about the name.
 	}
 
-	std::map<std::string, uint32_t> lib_symbol_map;
+	std::unordered_map<std::string, uint32_t> lib_symbol_map;
 
 
 	// map of which modules have been loaded or are pending processing.
