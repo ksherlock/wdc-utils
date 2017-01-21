@@ -410,6 +410,11 @@ void simplify() {
  *
  */
 
+std::string &upper_case(std::string &s) {
+	std::transform(s.begin(), s.end(), s.begin(), std::toupper);
+	return s;
+}
+
 void one_module(const std::vector<uint8_t> &data, 
 	const std::vector<uint8_t> &section_data, 
 	const std::vector<uint8_t> &symbol_data,
@@ -448,6 +453,63 @@ void one_module(const std::vector<uint8_t> &data,
 			int virtual_section = sections.size();
 			remap_section[s.number] = virtual_section;
 			s.number = virtual_section;
+
+			if (!(s.flags & SEC_NONAME)) {
+				/* generate an _BEG_name_ and _END_name */
+
+				symbol sym;
+
+				sym.name = "_BEG_" + s.name;
+				upper_case(sym.name);
+				sym.section = virtual_section;
+				sym.type = S_REL; // check if section has offset?
+				sym.flags = SF_DEF | SF_GBL;
+
+
+				auto iter = symbol_map.find(sym.name);
+				if (iter == symbol_map.end()) {
+					symbol_map.emplace(sym.name, symbols.size());
+					symbols.emplace_back(std::move(sym));
+				} else {
+					// duplicate label error...
+				}
+
+				// add entry for name? or handle via undefined symbol lookup below?
+
+				sym.name = s.name;
+				sym.section = virtual_section;
+				sym.type = S_REL;
+				sym.flags = SF_DEF | SF_GBL;
+
+				iter = symbol_map.find(sym.name);
+				if (iter == symbol_map.end()) {
+					symbol_map.emplace(sym.name, symbols.size());
+					symbols.emplace_back(std::move(sym));
+				} else {
+					// duplicate label error...
+				}
+
+
+				sym.name = "_END_" + s.name;
+				upper_case(sym.name);
+
+				sym.section = symbols.size();
+				sym.type = S_UND;
+				sym.flags = 0;
+
+				iter = symbol_map.find(sym.name);
+				if (iter == symbol_map.end()) {
+					s.end_symbol = sym.section;
+					symbol_map.emplace(sym.name, sym.section);
+					symbols.emplace_back(std::move(sym));	
+				} else {
+					// duplicate label...
+				}
+
+
+
+			}
+
 			sections.emplace_back(s);
 			section_map.emplace(s.name, virtual_section);
 
@@ -757,10 +819,13 @@ void init() {
 		s.type = S_UND;
 		s.flags = 0;
 
-		symbol_map.emplace(s.name, i * 2 + 1);
+		sections[i].end_symbol = s.section;
+
+		symbol_map.emplace(s.name, s.section);
 		symbols.emplace_back(s);
 
-
+		// even though it's undefined, don't add it to the undefined list ...
+		// don't need to search libraries for it!
 	}
 
 }
@@ -777,6 +842,7 @@ void generate_end() {
 			"_END_UDATA"	
 	};
 */
+	/*
 	for (int i = 0; i < 5; ++i) {
 		symbol s;
 		s.section = i;
@@ -786,6 +852,20 @@ void generate_end() {
 
 		symbols[i * 2 + 1] = s;
 	}
+
+	*/
+
+	for (const auto &s : sections) {
+		if (!s.end_symbol) continue;
+		symbol &sym = symbols[s.end_symbol];
+
+		sym.section = s.number;
+		sym.type = S_REL;
+		sym.flags = SF_DEF | SF_GBL;
+		sym.offset = s.size;
+	}
+
+
 }
 
 
