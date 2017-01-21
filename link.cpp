@@ -833,6 +833,29 @@ void init() {
 
 }
 
+/*
+ * add and return an undefined symbol. if known, adds it to the missing set.
+ * if symbol is already defined, returns it.
+ */
+symbol &reserve_symbol(const std::string &name, bool open = true) {
+
+	auto iter = symbol_map.find(name);
+	if (iter != symbol_map.end()) return symbols[iter->second];
+
+	if (open) undefined_symbols.emplace(name);
+	else undefined_symbols.erase(name);
+
+	symbols.emplace_back();
+	auto &sym = symbols.back();
+
+	sym.name = name;
+	sym.type = S_UND;
+	sym.section = symbols.size() - 1;
+
+	symbol_map.emplace(name, sym.section);
+
+	return sym;
+}
 
 void generate_end() {
 
