@@ -185,6 +185,7 @@ static void afp_init(struct AFP_Info *info, uint16_t file_type, uint32_t aux_typ
 	memset(info, 0, sizeof(*info));
 	info->magic = 0x00504641;
 	info->version = 0x00010000;
+	info->backup_date = 0x80000000;
 	info->prodos_file_type = file_type;
 	info->prodos_aux_type = aux_type;
 	if (file_type || aux_type)
