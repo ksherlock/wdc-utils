@@ -411,7 +411,7 @@ void simplify() {
  */
 
 std::string &upper_case(std::string &s) {
-	std::transform(s.begin(), s.end(), s.begin(), std::toupper);
+	std::transform(s.begin(), s.end(), s.begin(), toupper);
 	return s;
 }
 
