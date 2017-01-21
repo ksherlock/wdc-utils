@@ -474,7 +474,10 @@ void one_module(const std::vector<uint8_t> &data,
 					// duplicate label error...
 				}
 
+
+/*
 				// add entry for name? or handle via undefined symbol lookup below?
+				handled at end if symbol undeinfed.
 
 				sym.name = s.name;
 				sym.section = virtual_section;
@@ -488,7 +491,7 @@ void one_module(const std::vector<uint8_t> &data,
 				} else {
 					// duplicate label error...
 				}
-
+*/
 
 				sym.name = "_END_" + s.name;
 				upper_case(sym.name);
@@ -856,13 +859,34 @@ void generate_end() {
 	*/
 
 	for (const auto &s : sections) {
-		if (!s.end_symbol) continue;
-		symbol &sym = symbols[s.end_symbol];
 
-		sym.section = s.number;
-		sym.type = S_REL;
-		sym.flags = SF_DEF | SF_GBL;
-		sym.offset = s.size;
+		// if there is an undefined symbol matching the section name, add it.
+		if ((s.flags & SEC_NONAME) == 0) {
+
+			auto iter = symbol_map.find(s.name);
+			if (iter != symbol_map.end()) {
+
+				symbol &sym = symbols[iter->second];
+				if (sym.type == S_UND) {
+					undefined_symbols.erase(s.name);
+					sym.section = s.number;
+					sym.type = S_REL;
+					sym.flags = SF_DEF | SF_GBL;
+					sym.offset = 0;
+				}
+			}
+		}
+
+
+		if (s.end_symbol) {
+
+			symbol &sym = symbols[s.end_symbol];
+
+			sym.section = s.number;
+			sym.type = S_REL;
+			sym.flags = SF_DEF | SF_GBL;
+			sym.offset = s.size;
+		}
 	}
 
 
