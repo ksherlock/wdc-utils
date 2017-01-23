@@ -3,7 +3,7 @@ CXXFLAGS = -std=c++14 -g -Wall -Wno-sign-compare
 CCFLAGS = -g
 
 DUMP_OBJS = dumpobj.o disassembler.o zrdz_disassembler.o
-LINK_OBJS = link.o expression.o omf.o set_file_type.o
+LINK_OBJS = link.o expression.o omf.o set_file_type.o finder_info_helper.o
 
 #UNAME_S := $(shell uname -s)
 #ifeq ($(UNAME_S),MINGW64_NT-10.0)
@@ -29,6 +29,7 @@ zrdz_disassembler.o : zrdz_disassembler.cpp zrdz_disassembler.h disassembler.h
 dumpobj.o : dumpobj.cpp zrdz_disassembler.h disassembler.h
 omf.o : omf.cpp omf.h
 expression.o : expression.cpp expression.h
+finder_info_helper.o : finder_info_helper.cpp finder_info_helper.h
 mingw/err.o : mingw/err.c mingw/err.h
 
 .PHONY: clean
