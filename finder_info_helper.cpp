@@ -45,6 +45,44 @@
 
 namespace {
 
+	/*
+
+     tech note PT515
+     ProDOS -> Macintosh conversion
+
+     ProDOS             Macintosh
+     Filetype    Auxtype    Creator    Filetype
+     $00          $0000     'pdos'     'BINA'
+     $B0 (SRC)    (any)     'pdos'     'TEXT'
+     $04 (TXT)    $0000     'pdos'     'TEXT'
+     $FF (SYS)    (any)     'pdos'     'PSYS'
+     $B3 (S16)    (any)     'pdos'     'PS16'
+     $uv          $wxyz     'pdos'     'p' $uv $wx $yz
+
+     Programmer's Reference for System 6.0:
+
+     ProDOS Macintosh
+     File Type Auxiliary Type Creator Type File Type
+     $00        $0000           “pdos”  “BINA”
+     $04 (TXT)  $0000           “pdos”  “TEXT”
+     $FF (SYS)  (any)           “pdos”  “PSYS”
+     $B3 (S16)  $DByz           “pdos”  “p” $B3 $DB $yz
+     $B3 (S16)  (any)           “pdos”  “PS16”
+     $D7        $0000           “pdos”  “MIDI”
+     $D8        $0000           “pdos”  “AIFF”
+     $D8        $0001           “pdos”  “AIFC”
+     $E0        $0005           “dCpy”  “dImg”
+     $FF (SYS)  (any)           “pdos”  “PSYS”
+     $uv        $wxyz           “pdos”  “p” $uv $wx $yz
+
+
+	  mpw standard:
+     $uv        (any)          "pdos"  printf("%02x  ",$uv)
+
+     */
+
+
+
 	int hex(uint8_t c)
 	{
 		if (c >= '0' && c <= '9') return c - '0';
@@ -443,6 +481,7 @@ bool finder_info_helper::is_text() const {
 	return false;
 }
 
+
 uint32_t finder_info_helper::file_type() const {
 	uint32_t rv = 0;
 	for (unsigned i = 0; i < 4; ++i) {
@@ -459,4 +498,19 @@ uint32_t finder_info_helper::creator_type() const {
 		rv |= _finder_info[i];
 	}
 	return rv;
+}
+
+void finder_info_helper::set_file_type(uint32_t x) {
+	_finder_info[0] = x >> 24;
+	_finder_info[1] = x >> 16;
+	_finder_info[2] = x >> 8;
+	_finder_info[3] = x >> 0;
+}
+
+
+void finder_info_helper::set_creator_type(uint32_t x) {
+	_finder_info[4] = x >> 24;
+	_finder_info[5] = x >> 16;
+	_finder_info[6] = x >> 8;
+	_finder_info[7] = x >> 0;
 }

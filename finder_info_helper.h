@@ -76,6 +76,9 @@ public:
 	void set_prodos_file_type(uint16_t);
 	void set_prodos_file_type(uint16_t, uint32_t);
 
+	void set_file_type(uint32_t);
+	void set_creator_type(uint32_t);
+
 	bool is_text() const;
 
 private:
