@@ -14,10 +14,10 @@ class disassembler {
 		void operator()(const std::string &expr, unsigned size);
 
 		template<class Iter>
-		void operator()(Iter begin, Iter end) { while (begin != end) code(*begin++); }
+		void operator()(Iter begin, Iter end) { while (begin != end) (*this)(*begin++); }
 
 		template<class T>
-		void operator()(const T &t) { code(std::begin(t), std::end(t)); }
+		void operator()(const T &t) { (*this)(std::begin(t), std::end(t)); }
 
 		void space(unsigned bytes);
 
@@ -55,9 +55,23 @@ class disassembler {
 
 	protected:
 
+
+		virtual std::pair<std::string, std::string> format_data(unsigned size, const uint8_t *data);
+		virtual std::pair<std::string, std::string> format_data(unsigned size, const std::string &);
+
+
+		void set_inline_data(int count) {
+			flush();
+			_code = count ? false : true;
+			_inline_data = count;
+		}
+
 		virtual int32_t next_label(int32_t pc) {
 			return -1;
 		}
+
+		virtual void event(uint8_t opcode, uint32_t operand) {}
+
 
 	private:
 
@@ -88,7 +102,10 @@ class disassembler {
 		unsigned _arg = 0;
 
 		bool _code = true;
+		int _inline_data = 0;
 		int32_t _next_label = -1;
+
+		bool _orca = true;
 
 		void check_labels();
 };

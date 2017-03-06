@@ -49,6 +49,7 @@ static constexpr const int mDPI =          0x7000;
 static constexpr const int mDPIL =         0x8000;
 static constexpr const int mRelative =     0x9000;
 static constexpr const int mBlockMove =    0xa000;
+static constexpr const int mImpliedA =     0xb000; // inc a, dec a, etc.
 
 static constexpr const int m_S =          0x0100;
 static constexpr const int m_X =          0x0200;
@@ -69,7 +70,7 @@ static constexpr const int modes[] =
 	1 | mDPIL,                  // 07 ora [dp]
 	0 | mImplied,               // 08 php
 	1 | mImmediate | m_M,       // 09 ora #imm
-	0 | mImplied,               // 0a asl a
+	0 | mImpliedA,              // 0a asl a
 	0 | mImplied,               // 0b phd
 	2 | mAbsolute,              // 0c tsb |abs
 	2 | mAbsolute,              // 0d ora |abs
@@ -86,7 +87,7 @@ static constexpr const int modes[] =
 	1 | mDPIL | m_Y,            // 17 ora [dp],y
 	0 | mImplied,               // 18 clc
 	2 | mAbsolute | m_Y,        // 19 ora |abs,y
-	0 | mImplied,               // 1a inc a
+	0 | mImpliedA,              // 1a inc a
 	0 | mImplied,               // 1b tcs
 	2 | mAbsolute,              // 1c trb |abs
 	2 | mAbsolute | m_X,        // 1d ora |abs,x
@@ -103,7 +104,7 @@ static constexpr const int modes[] =
 	1 | mDPIL,                  // 27 and [dp]
 	0 | mImplied,               // 28 plp
 	1 | mImmediate | m_M,       // 29 and #imm
-	0 | mImplied,               // 2a rol a
+	0 | mImpliedA,              // 2a rol a
 	0 | mImplied,               // 2b pld
 	2 | mAbsolute,              // 2c bit |abs
 	2 | mAbsolute,              // 2d and |abs
@@ -120,7 +121,7 @@ static constexpr const int modes[] =
 	1 | mDPIL | m_Y,            // 37 and [dp],y
 	0 | mImplied,               // 38 sec
 	2 | mAbsolute | m_Y,        // 39 and |abs,y
-	0 | mImplied,               // 3a dec a
+	0 | mImpliedA,              // 3a dec a
 	0 | mImplied,               // 3b tsc
 	2 | mAbsolute | m_X,        // 3c bits |abs,x
 	2 | mAbsolute | m_X,        // 3d and |abs,x
@@ -137,7 +138,7 @@ static constexpr const int modes[] =
 	1 | mDPIL,                  // 47 eor [dp]
 	0 | mImplied,               // 48 pha
 	1 | mImmediate | m_M,       // 49 eor #imm
-	0 | mImplied,               // 4a lsr a
+	0 | mImpliedA,              // 4a lsr a
 	0 | mImplied,               // 4b phk
 	2 | mAbsolute,              // 4c jmp |abs
 	2 | mAbsolute,              // 4d eor |abs
@@ -431,7 +432,36 @@ void disassembler::reset() {
 }
 
 
+std::pair<std::string, std::string> 
+disassembler::format_data(unsigned size, const uint8_t *data) {
 
+	std::string tmp;
+
+	for (unsigned i = 0; i < size; ++i) {
+		if (i > 0) tmp += ", ";
+		tmp += to_x(data[i], 2, '$');
+	}
+
+	return std::make_pair("db", tmp);
+}
+
+std::pair<std::string, std::string> 
+disassembler::format_data(unsigned size, const std::string &data) {
+
+	switch(size) {
+		case 1: return std::make_pair("db", data);
+		case 2: return std::make_pair("dw", data);
+		case 3: return std::make_pair("da", data);
+		case 4: return std::make_pair("dl", data);
+
+		default: { 
+			std::string tmp;
+			tmp = std::to_string(size) + " bytes";
+			return std::make_pair(tmp, data);
+
+		}
+	}
+}
 
 void disassembler::dump() {
 
@@ -440,15 +470,12 @@ void disassembler::dump() {
 	if (!_st) return;
 
 
+	auto p = format_data(_st, _bytes);
+
 	indent_to(line, kOpcodeTab);
-	line += "db";
+	line += p.first;
 	indent_to(line, kOperandTab);
-
-
-	for (unsigned i = 0; i < _st; ++i) {
-		if (i > 0) line += ", ";
-		line += to_x(_bytes[i], 2, '$');
-	}
+	line += p.second;
 
 	hexdump(line);
 	line.push_back('\n');
@@ -466,20 +493,12 @@ void disassembler::dump(const std::string &expr, unsigned size) {
 
 	for (_st = 0; _st < size; ++_st) _bytes[_st] = 0;
 
-	indent_to(line, kOpcodeTab);
+	auto p = format_data(size, expr);
 
-	switch(size) {
-		case 1: line += "db"; break;
-		case 2: line += "dw"; break;
-		case 3: line += "da"; break;
-		case 4: line += "dl"; break;
-		default:
-			line += std::to_string(size);
-			line += " bytes";
-			break;
-	}
+	indent_to(line, kOpcodeTab);
+	line += p.first;
 	indent_to(line, kOperandTab);
-	line += expr;
+	line += p.second;
 
 	hexdump(line);
 	line.push_back('\n');
@@ -551,6 +570,10 @@ void disassembler::operator()(const std::string &expr, unsigned size) {
 
 	if (!_code) {
 		dump(expr, size);
+		if (_inline_data) {
+			_inline_data -= size;
+			if (_inline_data <= 0) _code = true; 
+		}
 		return;
 	}
 
@@ -558,7 +581,7 @@ void disassembler::operator()(const std::string &expr, unsigned size) {
 		dump(expr, size);
 		return;
 	}
-	for(int i = 0; i < size; ++i) _bytes[_st++] = 0;
+	for (int i = 0; i < size; ++i) _bytes[_st++] = 0;
 	print(expr);
 }
 
@@ -570,6 +593,13 @@ void disassembler::operator()(uint8_t byte) {
 
 	if (!_code) {
 		_bytes[_st++] = byte;
+
+		if (_inline_data && --_inline_data <= 0) {
+			dump();
+			_code = true;
+			return;
+		}
+
 		if (_st == 4) dump();
 		return;
 	}
@@ -578,18 +608,29 @@ void disassembler::operator()(uint8_t byte) {
 	if (_st == 1) {
 		_op = byte;
 		_mode = modes[_op];
+
+		if (_orca && _op == 0xf4) _mode = 2 | mAbsolute;
 		_size = _mode & 0x0f;
 		if (_mode & _flags & m_I) _size++;
 		if (_mode & _flags & m_M) _size++;
 
 		if (!_size) {
 			print();
+
+			//if (byte == 0x6b) {
+			//	// rtl
+			//	set_code(false);
+			//}
+
 		}
 		return;
 	}
 	unsigned shift = (_st - 2) * 8;
 	_arg = _arg + (byte << shift);
 	if (_st <= _size) return;
+
+	uint8_t op = _op;
+	uint32_t arg = _arg;
 
 	switch(_op) {
 		case 0xc2: // REP
@@ -602,6 +643,19 @@ void disassembler::operator()(uint8_t byte) {
 
 	// all done... now print it.
 	print();
+
+	switch(op) {
+		case 0xc2:
+		case 0xe2:
+		case 0x22:
+		case 0x5c:
+		case 0xdc:
+			event(op, arg);
+			break;
+	}
+
+
+
 }
 
 
@@ -808,8 +862,16 @@ void disassembler::print() {
 
 	std::string line;
 
+
+
+
 	indent_to(line, kOpcodeTab);
 	line.append(&opcodes[_op * 3], 3);
+
+	if (_mode == mImpliedA && _orca) {
+		indent_to(line, kOperandTab);
+		line.append("a");
+	}
 
 
 	hexdump(line);
