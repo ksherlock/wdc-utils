@@ -921,6 +921,7 @@ std::vector<omf::segment> omf_segments;
 
 template<class T>
 void append(std::vector<T> &to, std::vector<T> &from) {
+	// std::move(from.begin(), from.end(), std::back_inserter(to));
 	to.insert(to.end(),
 		std::make_move_iterator(from.begin()),
 		std::make_move_iterator(from.end())
