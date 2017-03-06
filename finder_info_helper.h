@@ -2,6 +2,8 @@
 #include <stdint.h>
 #include <string>
 
+#include <system_error>
+
 #if defined(_WIN32)
 #pragma pack(push, 2)
 struct AFP_Info {
@@ -21,6 +23,12 @@ struct AFP_Info {
 class finder_info_helper {
 
 public:
+
+	enum open_mode {
+		read_only = 1,
+		write_only = 2,
+		read_write = 3,
+	};
 
 	finder_info_helper();
 	~finder_info_helper();
@@ -49,10 +57,33 @@ public:
 	}
 
 
-	bool read(const std::string &fname);
-	bool write(const std::string &fname);
-	bool open(const std::string &fname, bool read_only = true);
-	bool write();
+	bool read(const std::string &fname, std::error_code &ec) {
+		return open(fname, ec);
+	}
+
+	bool write(const std::string &fname, std::error_code &ec);
+
+	bool open(
+		const std::string &fname, 
+		std::error_code &ec,
+		open_mode perm = read_only
+	);
+
+#if 0
+	bool read(const filesystem::path &pathName, std::error_code &ec) {
+		return open(pathName, ec);
+	}
+
+	bool write(const filesystem::path &pathName, std::error_code &ec);
+
+	bool open(
+		const filesystem::path &pathName, 
+		std::error_code &ec,
+		open_mode perm = read_only
+	);
+#endif
+
+	bool write(std::error_code &ec);
 
 	uint32_t creator_type() const;
 	uint32_t file_type() const;
@@ -80,11 +111,12 @@ public:
 	void set_creator_type(uint32_t);
 
 	bool is_text() const;
+	bool is_binary() const;
 
 private:
 
-	bool write(int fd);
-	bool read(int fd);
+	bool write(int fd, std::error_code &ec);
+	bool read(int fd, std::error_code &ec);
 
 	int _fd = -1;
 

@@ -206,6 +206,12 @@ namespace {
 	}
 
 
+	template<class T>
+	T _(const T t, std::error_code &ec) {
+		if (t < 0) ec = std::error_code(errno, std::generic_category());
+		return t;
+	}
+
 	/*
 	 * extended attributes functions.
 	 */
@@ -293,19 +299,30 @@ namespace {
 
 
 
+	int fi_open(const std::wstring &path, int perm) {
+#if defined(_WIN32)
+		std::wstring s(path);
+		s.append(L":" XATTR_FINDERINFO_NAME);
+		if (perm == 1) return open(s.c_str(), O_RDONLY | O_BINARY);
+		else return open(s.c_str(), O_RDWR | O_CREAT | O_BINARY, 0666);
+#else
 
-	int fi_open(const std::string &path, bool read_only) {
+#endif
+	}
+
+	int fi_open(const std::string &path, int perm) {
 
 	#if defined(__sun__)
-		if (read_only) return attropen(path.c_str(), XATTR_FINDERINFO_NAME, O_RDONLY);
+		if (perm == 1) return attropen(path.c_str(), XATTR_FINDERINFO_NAME, O_RDONLY);
 		else return attropen(path.c_str(), XATTR_FINDERINFO_NAME, O_RDWR | O_CREAT, 0666);
 	#elif defined(_WIN32)
 		std::string s(path);
 		s.append(":" XATTR_FINDERINFO_NAME);
-		if (read_only) return open(s.c_str(), O_RDONLY | O_BINARY);
+		if (perm == 1) return open(s.c_str(), O_RDONLY | O_BINARY);
 		else return open(s.c_str(), O_RDWR | O_CREAT | O_BINARY, 0666);
 	#else
-
+		// linux needs to open as read/write to write it?
+		//return open(path.c_str(), read_only ? O_RDONLY : O_RDWR);
 		return open(path.c_str(), O_RDONLY);
 	#endif
 	}
@@ -370,10 +387,12 @@ enum {
 void afp_synchronize(struct AFP_Info *info, int trust) {
 	// if ftype/auxtype is inconsistent between prodos and finder info, use
 	// prodos as source of truth.
-	uint16_t f;
-	uint32_t a;
-	if (finder_info_to_filetype(info->finder_info, &f, &a) != 0) return;
-	if (f == info->prodos_file_type && a == info->prodos_aux_type) return;
+	uint16_t f = 0;
+	uint32_t a = 0;
+	if (finder_info_to_filetype(info->finder_info, &f, &a)) {
+		if (f == info->prodos_file_type && a == info->prodos_aux_type) return;
+	}
+	
 	if (trust == trust_prodos)
 		file_type_to_finder_info(info->finder_info, info->prodos_file_type, info->prodos_aux_type);
 	else {
@@ -400,36 +419,86 @@ finder_info_helper::~finder_info_helper() {
 	if (_fd >= 0) close(_fd);
 }
 
-bool finder_info_helper::open(const std::string &name, bool read_only) {
+bool finder_info_helper::open(const std::string &name, std::error_code &ec, open_mode perm) {
+
+	ec.clear();
 
 	if (_fd >= 0) {
 		close(_fd);
 		_fd = -1;
 	}
-	int fd = fi_open(name, read_only);
+
+	if (perm < 1 || perm > 3) {
+		ec = std::make_error_code(std::errc::invalid_argument);
+		return false;
+	}
+
+	int fd = _(fi_open(name, perm), ec);
 	if (fd < 0) return false;
 
-	int ok = read(fd);
-	// if write mode, it's ok if finder info doesn't exist (yet).
-	if (!read_only && !ok) ok = true;
+	// win32 should read even if write-only.
+	bool ok = read(fd, ec);
 
-	if (read_only) close(fd);
-	else _fd = fd;
+	if (perm == read_only) {
+		close(fd);
+		return ok;
+	}
 
-	return ok;
+	// write mode, so it's ok if it doesn't exist.
+	if (!ok) ec.clear();
+	_fd = fd;
+	return true;
 }
 
-bool finder_info_helper::read(int fd) {
+#if 0
+bool finder_info_helper::open(const filesystem::path &pathName, std::error_code &ec, open_mode perm) {
+
+	ec.clear();
+
+	if (_fd >= 0) {
+		close(_fd);
+		_fd = -1;
+	}
+
+	if (perm < 1 || perm > 3) {
+		ec = std::make_error_code(std::errc::invalid_argument);
+		return false;
+	}
+
+	int fd = _(fi_open(pathName.native(), perm), ec);
+	if (fd < 0) return false;
+
+	// win32 should read even if write-only.
+	bool ok = read(fd, ec);
+
+	if (perm == read_only) {
+		close(fd);
+		return ok;
+	}
+
+	// write mode, so it's ok if it doesn't exist.
+	if (!ok) ec.clear();
+	_fd = fd;
+	return true;
+}
+#endif
+
+bool finder_info_helper::read(int fd, std::error_code &ec) {
 #if defined(_WIN32)
-	int ok = fi_read(fd, &_afp, sizeof(_afp));
+	int ok = _(fi_read(fd, &_afp, sizeof(_afp)), ec);
+	if (ok < 0) {
+		afp_init(&_afp);
+		return false;
+	}
 	if (ok < sizeof(_afp) || !afp_verify(&_afp)) {
+		ec = std::make_error_code(std::errc::illegal_byte_sequence); // close enough!
 		afp_init(&_afp);
 		return false;
 	}
 	if (!_afp.prodos_file_type && !_afp.prodos_aux_type)
 		afp_synchronize(&_afp, trust_hfs);
 #else
-	int ok = fi_read(fd, &_finder_info, sizeof(_finder_info));
+	int ok = _(fi_read(fd, &_finder_info, sizeof(_finder_info)), ec);
 	if (ok < 0) {
 		memset(&_finder_info, 0, sizeof(_finder_info));
 		return false;
@@ -439,27 +508,44 @@ bool finder_info_helper::read(int fd) {
 	return true;
 }
 
-bool finder_info_helper::write(int fd) {
+bool finder_info_helper::write(int fd, std::error_code &ec) {
 #if defined(_WIN32)
-	return fi_write(fd, &_afp, sizeof(_afp));
+	return _(fi_write(fd, &_afp, sizeof(_afp)),ec);
 #else
-	return fi_write(fd, &_finder_info, sizeof(_finder_info));
+	return _(fi_write(fd, &_finder_info, sizeof(_finder_info)),ec);
 #endif
 }
 
-bool finder_info_helper::write() {
-	return write(_fd);
+bool finder_info_helper::write(std::error_code &ec) {
+	ec.clear();
+	return write(_fd, ec);
 }
 
 
-bool finder_info_helper::write(const std::string &name) {
-	int fd = fi_open(name, false);
-	if (fd < 0) return false;
-	bool ok = write(fd);
+bool finder_info_helper::write(const std::string &name, std::error_code &ec) {
+	ec.clear();
+	int fd = _(fi_open(name, write_only), ec);
+
+	if (fd < 0)
+		return false;
+
+	bool ok = write(fd, ec);
 	close(fd);
 	return ok;
 }
 
+#if 0
+bool finder_info_helper::write(const filesystem::path &pathName, std::error_code &ec) {
+	ec.clear();
+	int fd = _(fi_open(pathName.native(), write_only), ec);
+	if (fd < 0)
+		return false;
+
+	bool ok = write(fd, ec);
+	close(fd);
+	return ok;
+}
+#endif
 
 
 void finder_info_helper::set_prodos_file_type(uint16_t ftype, uint32_t atype) {
@@ -480,6 +566,15 @@ bool finder_info_helper::is_text() const {
 
 	return false;
 }
+
+bool finder_info_helper::is_binary() const {
+	if (is_text()) return false;
+	if (_prodos_file_type || _prodos_aux_type) return true;
+
+	if (memcmp(_finder_info, "\x00\x00\x00\x00\x00\x00\x00\x00", 8) == 0) return false;
+	return true;
+}
+
 
 
 uint32_t finder_info_helper::file_type() const {
