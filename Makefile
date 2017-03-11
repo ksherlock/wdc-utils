@@ -5,8 +5,15 @@ CCFLAGS = -g
 DUMP_OBJS = dumpobj.o disassembler.o zrdz_disassembler.o
 LINK_OBJS = link.o expression.o omf.o set_file_type.o finder_info_helper.o
 
-#UNAME_S := $(shell uname -s)
-#ifeq ($(UNAME_S),MINGW64_NT-10.0)
+# static link if using mingw32 or mingw64 to make redistribution easier.
+# also add mingw directory.
+ifeq ($(MSYSTEM),MINGW32)
+	DUMP_OBJS += mingw/err.o
+	LINK_OBJS += mingw/err.o
+	CPPFLAGS += -I mingw/
+	LDLIBS += -static
+endif
+
 ifeq ($(MSYSTEM),MINGW64)
 	DUMP_OBJS += mingw/err.o
 	LINK_OBJS += mingw/err.o
