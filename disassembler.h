@@ -83,9 +83,6 @@ class disassembler {
 		void print();
 		void print(const std::string &expr);
 
-		void print_prefix();
-		void print_suffix();
-
 		std::string prefix();
 		std::string suffix();
 

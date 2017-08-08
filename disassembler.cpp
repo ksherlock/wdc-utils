@@ -659,31 +659,6 @@ void disassembler::operator()(uint8_t byte) {
 }
 
 
-
-void disassembler::print_prefix() {
-
-	switch(_mode & 0xf000) {
-		case mImmediate: printf("\t#"); break;
-		case mDP: printf("\t<"); break;
-		case mDPI: printf("\t(<"); break;
-		case mDPIL: printf("\t[<"); break;
-		case mAbsoluteIL: printf("\t["); break;
-
-		case mRelative:
-		case mBlockMove:
-			printf("\t"); break;
-
-		// cop, brk are treated as absolute.
-		case mAbsolute: 
-			if (_size == 1) printf("\t");
-			else printf("\t|");
-			break;
-		case mAbsoluteLong: printf("\t>"); break;
-		case mAbsoluteI: printf("\t("); break;
-	}
-}
-
-
 std::string disassembler::prefix() {
 
 	std::string tmp;
@@ -743,36 +718,6 @@ std::string disassembler::suffix() {
 			tmp += ",y"; break;
 	}	
 	return tmp;
-
-}
-
-void disassembler::print_suffix() {
-
-	switch(_mode & 0x0f00) {
-		case m_X: printf(",x"); break;
-		case m_Y: if (!(_mode & (mDPI|mDPIL))) printf(",y"); break;
-		case m_S:
-		case m_S | m_Y:
-			printf(",s"); break;
-	}
-
-	switch(_mode & 0xf000) {
-		case mAbsoluteI:
-		case mDPI:
-			printf(")"); break;
-		case mAbsoluteIL:
-		case mDPIL:
-			printf("]"); break;
-	}
-
-	// (xxx,s),y
-	// (xxx),y
-	// [xxx],y
-	switch(_mode & 0x0f00) {
-		case m_Y: if (_mode & (mDPI|mDPIL)) printf(",y"); break;
-		case m_S | m_Y:
-			printf(",y"); break;
-	}		
 
 }
 
