@@ -1,9 +1,9 @@
 LINK.o = $(LINK.cc)
-CXXFLAGS = -std=c++14 -g -Wall -Wno-sign-compare
+CXXFLAGS = -std=c++14 -g -Wall -Wno-sign-compare 
 CCFLAGS = -g
 
 DUMP_OBJS = dumpobj.o disassembler.o zrdz_disassembler.o
-LINK_OBJS = link.o expression.o omf.o set_file_type.o finder_info_helper.o
+LINK_OBJS = link.o expression.o omf.o set_file_type.o afp/libafp.a
 
 # static link if using mingw32 or mingw64 to make redistribution easier.
 # also add mingw directory.
@@ -31,17 +31,25 @@ wdclink : $(LINK_OBJS)
 	$(LINK.o) $^ $(LDLIBS) -o $@
 
 
+subdirs :
+	$(MAKE) -C afp
+
 disassembler.o : disassembler.cpp disassembler.h
 zrdz_disassembler.o : zrdz_disassembler.cpp zrdz_disassembler.h disassembler.h
 dumpobj.o : dumpobj.cpp zrdz_disassembler.h disassembler.h
 omf.o : omf.cpp omf.h
 expression.o : expression.cpp expression.h
-finder_info_helper.o : finder_info_helper.cpp finder_info_helper.h
 mingw/err.o : mingw/err.c mingw/err.h
+
+set_file_type.o : CPPFLAGS += -I afp/include
+set_file_type.o : set_file_type.cpp
+
+afp/libafp.a : subdirs
 
 .PHONY: clean
 clean:
 	$(RM) wdcdumpobj wdclink $(DUMP_OBJS) $(LINK_OBJS)
+	$(MAKE) -C afp clean
 
 
 .PHONY: variables
