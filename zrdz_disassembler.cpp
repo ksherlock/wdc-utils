@@ -7,8 +7,8 @@
 
 static constexpr const int equ_type = (ST_EQU << 4) | S_ABS;
 
-zrdz_disassembler::zrdz_disassembler(std::vector<section> &&sections, std::vector<symbol> &&symbols) :
-	_symbols(std::move(symbols))
+zrdz_disassembler::zrdz_disassembler(std::vector<section> &&sections, std::vector<symbol> &&symbols) : 
+	disassembler(wdc), _symbols(std::move(symbols))
 {
 
 	// do not sort _symbols ... order matters for lookup by entry number.
