@@ -319,7 +319,7 @@ static constexpr const int modes[] =
 	1 | mDPI | m_Y,                 // f1 sbc (dp),y
 	1 | mDPI,                       // f2 sbc (dp)
 	1 | mDPI | m_S | m_Y,           // f3 sbc ,s,y
-	2 | mImmediate,                 // f4 pea |abs --> pea #imm
+	2 | mAbsolute,                 // f4 pea |abs --> pea #imm
 	1 | mDP | m_X,                  // f5 sbc dp,x
 	1 | mDP | m_X,                  // f6 inc dp,x
 	1 | mDPIL | m_Y,                // f7 sbc [dp],y
@@ -333,6 +333,38 @@ static constexpr const int modes[] =
 	3 | mAbsoluteLong | m_X,        // ff sbc >abs,x      
 
 };
+
+static bool branchlike(uint8_t op) {
+
+	switch(op) {
+		case 0x10: // bpl
+		//case 0x20: // jsr
+		//case 0x22: // jsl
+		case 0x30: // bmi
+		case 0x40: // rti
+		case 0x4c: // jmp
+		case 0x50: // bvc
+		case 0x5c: // jml
+		case 0x60: // rts
+		case 0x6b: // rtl
+		case 0x6c: // jmp
+		case 0x70: // bvs
+		case 0x7c: // jmp
+		case 0x80: // bra
+		case 0x82: // brl
+		case 0x90: // bcc
+		case 0xb0: // bcs
+		case 0xd0: // bne
+		case 0xdc: // jml
+		case 0xf0: // beq
+		//case 0xfc: // jsr
+			return true;
+		default:
+			return false;
+	}
+
+}
+
 
 constexpr const int kOpcodeTab = 20;
 constexpr const int kOperandTab = 30;
@@ -369,6 +401,15 @@ std::string disassembler::to_x(uint32_t x, unsigned bytes, char prefix) {
 	return s;
 }
 
+int disassembler::operand_size(uint8_t op, bool m, bool x) {
+	unsigned mode = modes[op];
+	unsigned size = mode & 0x0f;
+	if ((mode & m_I) && x) size++; 
+	if ((mode & m_M) && m) size++;
+	return size;
+}
+
+
 
 void disassembler::emit(const std::string &label) {
 	fputs(label.c_str(), stdout);
@@ -379,13 +420,8 @@ void disassembler::emit(const std::string &label, const std::string &opcode) {
 	std::string tmp;
 	tmp = label;
 
-	int column = tmp.length();
-
 	if (!opcode.empty()) {
-		do {
-			tmp.push_back(' ');
-			column++;
-		} while (column < kOpcodeTab);
+		indent_to(tmp, kOpcodeTab);
 		tmp += opcode;
 	}
 
@@ -400,28 +436,47 @@ void disassembler::emit(const std::string &label, const std::string &opcode, con
 	std::string tmp;
 	tmp = label;
 
-	int column = tmp.length();
 
 	if (!opcode.empty()) {
-		do {
-			tmp.push_back(' ');
-			column++;
-		} while (column < kOpcodeTab);
+		indent_to(tmp, kOpcodeTab);
 		tmp += opcode;
 	}
 
-	column = tmp.length();
 	if (!operand.empty()) {
-		do {
-			tmp.push_back(' ');
-			column++;
-		} while (column < kOperandTab);
+		indent_to(tmp, kOperandTab);
 		tmp += operand;
 	}
 
 	tmp.push_back('\n');
 	fputs(tmp.c_str(), stdout);
 }
+
+
+void disassembler::emit(const std::string &label, const std::string &opcode, const std::string &operand, const std::string &comment) {
+
+	std::string tmp;
+	tmp = label;
+
+	if (!opcode.empty()) {
+		indent_to(tmp, kOpcodeTab);
+		tmp += opcode;
+	}
+
+	if (!operand.empty()) {
+		indent_to(tmp, kOperandTab);
+		tmp += operand;
+	}
+
+	if (!comment.empty()) {
+		indent_to(tmp, kCommentTab);
+		tmp += "; ";
+		tmp += comment;	
+	}
+
+	tmp.push_back('\n');
+	fputs(tmp.c_str(), stdout);
+}
+
 
 
 
@@ -485,13 +540,16 @@ void disassembler::dump() {
 	reset();
 }
 
-void disassembler::dump(const std::string &expr, unsigned size) {
+void disassembler::dump(const std::string &expr, unsigned size, uint32_t value) {
 
 	std::string line;
 
 	if (_st) dump();
 
-	for (_st = 0; _st < size; ++_st) _bytes[_st] = 0;
+	for (_st = 0; _st < size; ++_st) {
+		_bytes[_st] = value & 0xff;
+		value >>= 8;
+	}
 
 	auto p = format_data(size, expr);
 
@@ -531,7 +589,7 @@ void disassembler::space(unsigned size) {
 	std::string line;
 
 	indent_to(line, kOpcodeTab);
-	line += "ds";
+	line += ds();
 	indent_to(line, kOperandTab);
 
 
@@ -563,13 +621,13 @@ void disassembler::space(unsigned size) {
 }
 
 
-void disassembler::operator()(const std::string &expr, unsigned size) {
+void disassembler::operator()(const std::string &expr, unsigned size, uint32_t value) {
 
-	// todo -- what if label within size?
-	check_labels();
+	if (_st == 0 || !_code)
+		check_labels();
 
 	if (!_code) {
-		dump(expr, size);
+		dump(expr, size, value);
 		if (_inline_data) {
 			_inline_data -= size;
 			if (_inline_data <= 0) _code = true; 
@@ -578,10 +636,13 @@ void disassembler::operator()(const std::string &expr, unsigned size) {
 	}
 
 	if (_st != 1 || size != _size) {
-		dump(expr, size);
+		dump(expr, size, value);
 		return;
 	}
-	for (int i = 0; i < size; ++i) _bytes[_st++] = 0;
+	for (int i = 0; i < size; ++i) {
+		_bytes[_st++] = value & 0xff;
+		value >>= 8;
+	}
 	print(expr);
 }
 
@@ -589,7 +650,8 @@ void disassembler::operator()(const std::string &expr, unsigned size) {
 
 void disassembler::operator()(uint8_t byte) {
 
-	check_labels();
+	if (_st == 0 || !_code)
+		check_labels();
 
 	if (!_code) {
 		_bytes[_st++] = byte;
@@ -609,7 +671,15 @@ void disassembler::operator()(uint8_t byte) {
 		_op = byte;
 		_mode = modes[_op];
 
-		if (_orca && _op == 0xf4) _mode = 2 | mAbsolute;
+		// bit hack
+		if (_traits & bit_hacks && _op == 0x2c) {
+			if (_next_label == _pc + 1) {
+				dump();
+				return;
+			}
+		}
+
+		if (_traits & pea_immediate && _op == 0xf4) _mode = 2 | mImmediate;
 		_size = _mode & 0x0f;
 		if (_mode & _flags & m_I) _size++;
 		if (_mode & _flags & m_M) _size++;
@@ -617,11 +687,7 @@ void disassembler::operator()(uint8_t byte) {
 		if (!_size) {
 			print();
 
-			//if (byte == 0x6b) {
-			//	// rtl
-			//	set_code(false);
-			//}
-
+			if (branchlike(byte)) fputs("\n", stdout);
 		}
 		return;
 	}
@@ -632,18 +698,23 @@ void disassembler::operator()(uint8_t byte) {
 	uint8_t op = _op;
 	uint32_t arg = _arg;
 
-	switch(_op) {
-		case 0xc2: // REP
-			_flags |= (_arg & 0x30);
-			break;
-		case 0xe2: // SEP
-			_flags &= ~(_arg & 0x30);
-			break;
+	if (_traits & track_rep_sep) {
+		switch(_op) {
+			case 0xc2: // REP
+				_flags |= (_arg & 0x30);
+				break;
+			case 0xe2: // SEP
+				_flags &= ~(_arg & 0x30);
+				break;
+		}
 	}
 
 	// all done... now print it.
 	print();
 
+	if (branchlike(op)) fputs("\n", stdout);
+
+	// todo -- subscribe to before/after events...
 	switch(op) {
 		case 0xc2:
 		case 0xe2:
@@ -742,33 +813,16 @@ void disassembler::hexdump(std::string &line) {
 	line += "  ";
 	for (i = 0; i < _st; ++i) {
 		uint8_t c = _bytes[i];
+		// msb flag?
+		if (_traits & msb_hexdump) c &= 0x7f;
 		if (isprint(c) && isascii(c)) line += c;
 		else line += '.';
 	}
 }
 
 
-
-void disassembler::hexdump() {
-	// print pc and hexdump...
-	int i;
-	printf("%04x:", _pc);
-	for (i = 0; i < _st; ++i) {
-		printf(" %02x", _bytes[i]);
-	}
-	for ( ; i < 4; ++i) {
-		printf("   ");
-	}
-	printf("  ");
-	for (i = 0; i < _st; ++i) {
-		uint8_t c = _bytes[i];
-		if (isprint(c) && isascii(c)) putc(c, stdout);
-		else putc('.', stdout); 
-	}
-	for ( ; i < 4; ++i) {
-		printf(" ");
-	}
-}
+std::string disassembler::label_for_address(uint32_t address) { return ""; }
+std::string disassembler::label_for_zp(uint32_t address) { return ""; }
 
 void disassembler::print() {
 
@@ -784,8 +838,11 @@ void disassembler::print() {
 				if ((_size == 1) && (_arg & 0x80))
 					pc += 0xff00;
 				pc &= 0xffff;
-				tmp = to_x(pc, 4, '$');
+
+
 				// it would be really fancy if it checked for a label name @pc...
+				tmp = label_for_address(pc);
+				if (tmp.empty()) tmp = to_x(pc, 4, '$');
 				break;
 			}
 			case mBlockMove: {
@@ -795,10 +852,25 @@ void disassembler::print() {
 					+ to_x((_arg >> 0) & 0xff, 2, '$');
 				break;
 			}
-			default: {
+			case mDP:
+			case mDPI:
+			case mDPIL:
+				tmp = label_for_zp(_arg);
+				if (tmp.empty()) tmp = to_x(_arg, _size * 2, '$');
+				break;
+
+			//case mImmediate:
+			case mAbsolute:
+			case mAbsoluteI:
+			case mAbsoluteIL:
+			case mAbsoluteLong:
+				tmp = label_for_address(_arg);
+				if (tmp.empty()) tmp = to_x(_arg, _size * 2, '$');
+				break;
+
+			default:
 				tmp = to_x(_arg, _size * 2, '$');
 				break;
-			}
 		}
 		print(tmp);
 		return;
@@ -813,7 +885,7 @@ void disassembler::print() {
 	indent_to(line, kOpcodeTab);
 	line.append(&opcodes[_op * 3], 3);
 
-	if (_mode == mImpliedA && _orca) {
+	if (_mode == mImpliedA && (_traits & explicit_implied_a)) {
 		indent_to(line, kOperandTab);
 		line.append("a");
 	}
@@ -848,4 +920,90 @@ void disassembler::print(const std::string &expr) {
 
 	_pc += _size + 1;
 	reset();	
+}
+
+
+#pragma mark -
+
+const std::vector<uint32_t> &analyzer::finish() {
+	std::sort(_labels.begin(), _labels.end());
+	auto end = std::unique(_labels.begin(), _labels.end());
+	_labels.erase(end, _labels.end());
+	return _labels;
+}
+
+
+void analyzer::operator()(uint8_t byte) {
+
+
+	if (!_code) {
+
+		if (_inline_data && --_inline_data <= 0) {
+			_code = true;
+			reset();
+			return;
+		}
+		return;
+	}
+
+	_st++;
+	if (_st == 1) {
+		_op = byte;
+		_mode = modes[_op];
+
+		_size = _mode & 0x0f;
+		if (_mode & _flags & m_I) _size++;
+		if (_mode & _flags & m_M) _size++;
+
+		if (!_size) { reset(); }
+		return;
+	}
+	unsigned shift = (_st - 2) * 8;
+	_arg = _arg + (byte << shift);
+	if (_st <= _size) return;
+
+
+	// all done... now process it
+	process();
+}
+
+void analyzer::reset() {
+	_pc += _st;
+	_arg = 0;
+	_st = 0;
+}
+
+void analyzer::process() {
+
+	if (_traits & disassembler::track_rep_sep) {
+		switch(_op) {
+			case 0xc2: // REP
+				_flags |= (_arg & 0x30);
+				break;
+			case 0xe2: // SEP
+				_flags &= ~(_arg & 0x30);
+				break;
+		}
+	}
+
+	switch (_mode & 0xf000) {
+		case mRelative: {
+
+			uint32_t pc = _pc + 1 + _size + _arg;
+
+			if ((_size == 1) && (_arg & 0x80))
+				pc += 0xff00;
+			pc &= 0xffff;
+
+			_labels.push_back(pc);
+			break;
+		}
+		case mAbsolute:
+		case mAbsoluteI:
+		case mAbsoluteLong: {
+			_labels.push_back(_arg);
+			break;
+		}
+	}
+	reset();
 }
