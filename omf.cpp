@@ -63,6 +63,9 @@ struct omf_express_header {
 
 #pragma pack(pop)
 
+static_assert(sizeof(omf_header) == 44, "OMF Header not packed");
+static_assert(sizeof(omf_express_header) == 48, "OMF Express Header not packed");
+
 void push(std::vector<uint8_t> &v, uint8_t x) {
 	v.push_back(x);
 }
@@ -86,7 +89,7 @@ void push(std::vector<uint8_t> &v, uint32_t x) {
 void push(std::vector<uint8_t> &v, const std::string &s) {
 	uint8_t count = std::min((int)s.size(), 255);
 	push(v, count);
-	v.insert(v.end(), s.begin(), s.end());
+	v.insert(v.end(), s.begin(), s.begin() + count);
 }
 
 class super_helper {
@@ -201,9 +204,9 @@ uint32_t add_relocs(std::vector<uint8_t> &data, size_t data_offset, omf::segment
 
 					auto &sr = ss[n];
 					if (!sr) sr.emplace();
+					sr->append(r.offset);
 
 					uint32_t value = r.value;
-					sr->append(r.offset);
 					for (int i = 0; i < 2; ++i, value >>= 8)
 						data[data_offset + r.offset + i] = value; 
 					continue;
@@ -217,9 +220,9 @@ uint32_t add_relocs(std::vector<uint8_t> &data, size_t data_offset, omf::segment
 
 					auto &sr = ss[n];
 					if (!sr) sr.emplace();
+					sr->append(r.offset);
 
 					uint32_t value = r.value;
-					sr->append(r.offset);
 					for (int i = 0; i < 3; ++i, value >>= 8)
 						data[data_offset + r.offset + i] = value; 
 					continue;	
@@ -231,9 +234,9 @@ uint32_t add_relocs(std::vector<uint8_t> &data, size_t data_offset, omf::segment
 					int n = SUPER_INTERSEG24 + seg.segnum;
 					auto &sr = ss[n];
 					if (!sr) sr.emplace();
+					sr->append(r.offset);
 
 					uint32_t value = r.value;
-					sr->append(r.offset);
 					for (int i = 0; i < 2; ++i, value >>= 8)
 						data[data_offset + r.offset + i] = value; 
 					continue;
@@ -265,8 +268,10 @@ uint32_t add_relocs(std::vector<uint8_t> &data, size_t data_offset, omf::segment
 					constexpr int n = SUPER_INTERSEG1;
 					auto &sr = ss[n];
 					if (!sr) sr.emplace();
+					sr->append(r.offset);
 
 					uint32_t value = r.segment_offset;
+
 					data[data_offset + r.offset + 0] = value; value >>= 8;
 					data[data_offset + r.offset + 1] = value; value >>= 8;
 					data[data_offset + r.offset + 2] = r.segment;
@@ -279,9 +284,9 @@ uint32_t add_relocs(std::vector<uint8_t> &data, size_t data_offset, omf::segment
 					int n = SUPER_INTERSEG12 + r.segment;
 					auto &sr = ss[n];
 					if (!sr) sr.emplace();
+					sr->append(r.offset);
 
 					uint32_t value = r.segment_offset;
-					sr->append(r.offset);
 					for (int i = 0; i < 2; ++i, value >>= 8)
 						data[data_offset + r.offset + i] = value; 
 					continue;
@@ -292,9 +297,9 @@ uint32_t add_relocs(std::vector<uint8_t> &data, size_t data_offset, omf::segment
 					int n = SUPER_INTERSEG24 + r.segment;
 					auto &sr = ss[n];
 					if (!sr) sr.emplace();
+					sr->append(r.offset);
 
 					uint32_t value = r.segment_offset;
-					sr->append(r.offset);
 					for (int i = 0; i < 2; ++i, value >>= 8)
 						data[data_offset + r.offset + i] = value; 
 					continue;
@@ -502,3 +507,4 @@ void save_omf(const std::string &path, std::vector<omf::segment> &segments, bool
 
 	close(fd);
 }
+
