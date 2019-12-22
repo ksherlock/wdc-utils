@@ -92,6 +92,12 @@ void push(std::vector<uint8_t> &v, const std::string &s) {
 	v.insert(v.end(), s.begin(), s.begin() + count);
 }
 
+void push(std::vector<uint8_t> &v, const std::string &s, size_t count) {
+	std::string tmp(s, 0, count);
+	tmp.resize(count, ' ');
+	v.insert(v.end(), tmp.begin(), tmp.end());
+}
+
 class super_helper {
 
 	std::vector<uint8_t> _data;
@@ -110,7 +116,8 @@ public:
 
 		if (page != _page) {
 			unsigned skip = page - _page;
-			if (skip > 1) {
+			if (_count) --skip;
+			if (skip) {
 				
 				while (skip >= 0x80) {
 					_data.push_back(0xff);
@@ -345,6 +352,38 @@ uint32_t add_relocs(std::vector<uint8_t> &data, size_t data_offset, omf::segment
 	return reloc_size;
 }
 
+void save_bin(const std::string &path, omf::segment &segment, uint32_t org) {
+
+	int fd;
+	fd = open(path.c_str(), O_WRONLY | O_CREAT | O_TRUNC | O_BINARY, 0666);
+	if (fd < 0) {
+		err(EX_CANTCREAT, "Unable to open %s", path.c_str());
+	}
+
+	auto &data = segment.data;
+
+	for (auto &r : segment.relocs) {
+
+		uint32_t value = r.value + org;
+		value >>= -(int8_t)r.shift;
+
+		unsigned offset = r.offset;
+		unsigned size = r.size;
+		while (size--) {
+			data[offset++] = value & 0xff;
+			value >>= 8;
+		}
+	}
+
+	auto ok = write(fd, data.data(), data.size());
+	if (ok < 0) {
+		close(fd);
+		err(EX_OSERR, "write %s", path.c_str());
+	}
+	close(fd);
+}
+
+
 void save_omf(const std::string &path, std::vector<omf::segment> &segments, bool compress, bool expressload) {
 
 	// expressload doesn't support links to other files. 
@@ -385,15 +424,26 @@ void save_omf(const std::string &path, std::vector<omf::segment> &segments, bool
 
 	for (auto &s : segments) {
 		omf_header h;
-		h.length = s.data.size();
+		h.length = s.data.size() + s.reserved_space;
 		h.kind = s.kind;
 		h.banksize = s.data.size() > 0xffff ? 0x0000 : 0x010000;
 		h.segnum = s.segnum;
+		h.alignment = s.alignment;
+		h.reserved_space = s.reserved_space;
+
+		uint32_t reserved_space = 0;
+		if (expressload) {
+			std::swap(reserved_space, h.reserved_space);
+		}
+
+		// length field INCLUDES reserved space.  Express expand reserved space.
+
 
 		std::vector<uint8_t> data;
 
 		// push segname and load name onto data.
-		data.insert(data.end(), 10, ' ');
+		// data.insert(data.end(), 10, ' ');
+		push(data, s.loadname, 10);
 		push(data, s.segname);
 
 		h.dispname = sizeof(omf_header);
@@ -402,16 +452,20 @@ void save_omf(const std::string &path, std::vector<omf::segment> &segments, bool
 
 
 		uint32_t lconst_offset = offset + sizeof(omf_header) + data.size() + 5;
-		uint32_t lconst_size = h.length;
+		uint32_t lconst_size = s.data.size() + reserved_space;
+
 
 		//lconst record
 		push(data, (uint8_t)omf::LCONST);
-		push(data, (uint32_t)h.length);
+		push(data, (uint32_t)lconst_size);
 
 		size_t data_offset = data.size();
 
 		data.insert(data.end(), s.data.begin(), s.data.end());
 
+		if (reserved_space) {
+			data.insert(data.end(), reserved_space, 0);
+		}
 
 		uint32_t reloc_offset = offset + sizeof(omf_header) + data.size();
 		uint32_t reloc_size = 0;
@@ -507,4 +561,3 @@ void save_omf(const std::string &path, std::vector<omf::segment> &segments, bool
 
 	close(fd);
 }
-

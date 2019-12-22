@@ -64,6 +64,8 @@ namespace omf {
 
 		uint16_t segnum = 0;
 		uint16_t kind = 0;
+		uint32_t alignment = 0;
+		uint32_t reserved_space = 0;
 
 		std::string loadname;
 		std::string segname;
