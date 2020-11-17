@@ -14,9 +14,20 @@ jobs:
         uses: msys2/setup-msys2@v2
         with:
           path-type: strict
+          install: base-devel
 
       # Runs a single command using the runners shell
       - name: Make MINGW32
         run: |
           set MSYSTEM=MINGW32
+          msys2 -c 'make'
+
+      - name: Make MINGW64
+        run: |
+          set MSYSTEM=MINGW64
+          msys2 -c 'make'
+
+      - name: Make MSYS2
+        run: |
+          set MSYSTEM=MSYS2
           msys2 -c 'make'
