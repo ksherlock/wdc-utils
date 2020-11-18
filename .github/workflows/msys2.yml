@@ -6,8 +6,10 @@ jobs:
   build:
     runs-on: windows-latest
 
+    strategy:
+      matrix:
+        msys: [MSYS2, MINGW32, MINGW64]
     steps:
-      # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
       - uses: actions/checkout@v2
         with:
           submodules: true
@@ -19,17 +21,7 @@ jobs:
           install: make gcc mingw32/mingw-w64-i686-gcc mingw64/mingw-w64-x86_64-gcc
 
       # Runs a single command using the runners shell
-      - name: Make MINGW32
+      - name: Make ${{ matrix.msys }}
         run: |
-          set MSYSTEM=MINGW32
-          msys2 -c 'make'
-
-      - name: Make MINGW64
-        run: |
-          set MSYSTEM=MINGW64
-          msys2 -c 'make'
-
-      - name: Make MSYS2
-        run: |
-          set MSYSTEM=MSYS2
+          set MSYSTEM=${{ matrix.msys }}
           msys2 -c 'make'
