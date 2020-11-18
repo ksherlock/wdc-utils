@@ -30,9 +30,9 @@
 
 
 struct {
-	bool _S = false;
-	bool _g = false;
-	bool _n = false;
+	bool S = false;
+	bool g = false;
+	bool n = false;
 } flags;
 
 
@@ -287,7 +287,7 @@ bool dump_obj(const char *name, int fd)
 
 
 								std::string name;
-								if (flags._n) {
+								if (flags.n) {
 									name = d.section_name(section) + "+" + d.to_x(offset, 4, '$');
 								} else {
 									name = d.location_name(section, offset);
@@ -549,7 +549,7 @@ bool dump_obj(const char *name, int fd)
 
 
 	unsigned f = 0;
-	if (flags._S) f |= 0x01;
+	if (flags.S) f |= 0x01;
 	d.back_matter(f);
 
 	if (iter != data.end() || op != REC_END) errx(EX_DATAERR, "%s records ended early", name);
@@ -661,9 +661,9 @@ int main(int argc, char **argv) {
 	int c;
 	while ((c = getopt(argc, argv, "Sgn")) != -1) {
 			switch(c) {
-				case 'S': flags._S = true; break;
-				case 'g': flags._g = true; break;
-				case 'n': flags._n = true; break;
+				case 'S': flags.S = true; break;
+				case 'g': flags.g = true; break;
+				case 'n': flags.n = true; break;
 				default: exit(EX_USAGE); break;
 			}
 	}

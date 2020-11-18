@@ -40,18 +40,18 @@
 
 
 struct {
-	bool _v = false;
-	bool _C = false;
-	bool _X = false;
-	bool _S = false;
-	std::string _o;
+	bool v = false;
+	bool C = false;
+	bool X = false;
+	bool S = false;
+	std::string o;
 
-	std::vector<std::string> _l;
-	std::vector<std::string> _L;
+	std::vector<std::string> l;
+	std::vector<std::string> L;
 
-	unsigned _errors = 0;
-	uint16_t _file_type;
-	uint32_t _aux_type;
+	unsigned errors = 0;
+	uint16_t file_type;
+	uint32_t aux_type;
 } flags;
 
 
@@ -360,7 +360,7 @@ inline void expr_error(bool fatal, const expression &e, const char *msg) {
 		fatal = true;
 	}
 
-	if (fatal) flags._errors++;
+	if (fatal) flags.errors++;
 }
 
 
@@ -532,7 +532,7 @@ void one_module(const std::vector<uint8_t> &data,
 	// convert local symbols to global.
 	for (auto &s : local_symbols) {
 
-		if (flags._v) {
+		if (flags.v) {
 			const char *status = "";
 			if (s.type == S_UND) status = "extern";
 			else if (s.flags & SF_GBL) status = "public";
@@ -599,7 +599,7 @@ void one_module(const std::vector<uint8_t> &data,
 					// ok if symbols are identical..
 					if (ss.type != s.type || ss.flags != s.flags || ss.section != s.section || ss.offset != s.offset) {
 						warnx("Duplicate label %s", s.name.c_str());
-						flags._errors++;
+						flags.errors++;
 					} 
 				}
 			}
@@ -1197,7 +1197,7 @@ void build_omf_segments() {
 
 
 	// add a stack segment at the end
-	if (flags._S) {
+	if (flags.S) {
 		auto &s = sections[SECT_PAGE0];
 
 		// create stack/dp segment.
@@ -1319,7 +1319,7 @@ bool one_module(const std::string &name, int fd, std::set<std::string> *local_un
 		return false;
 	}
 
-	if (flags._v) {
+	if (flags.v) {
 		printf("Processing %s:%s\n", name.c_str(), module_name.c_str());
 	}
 
@@ -1334,7 +1334,7 @@ bool one_module(const std::string &name, int fd, std::set<std::string> *local_un
 
 bool one_file(const std::string &name) {
 
-	if (flags._v) printf("Processing %s\n", name.c_str());
+	if (flags.v) printf("Processing %s\n", name.c_str());
 
 	int fd = open(name.c_str(), O_RDONLY | O_BINARY);
 	if (fd < 0) {
@@ -1449,7 +1449,7 @@ bool one_lib(const std::string &path) {
 		if (errno == ENOENT) return false;
 	}
 
-	if (flags._v) printf("Processing library %s\n", path.c_str());
+	if (flags.v) printf("Processing library %s\n", path.c_str());
 
 	if (fd < 0) {
 		warn("Unable to open %s", path.c_str());
@@ -1567,8 +1567,8 @@ void libraries() {
 
 	if (undefined_symbols.empty()) return;
 
-	for (auto &l : flags._l) {
-		for (auto &L : flags._L) {
+	for (auto &l : flags.l) {
+		for (auto &L : flags.L) {
 			//std::string path = L + "lib" + l;
 			std::string path = L + l + ".lib";
 
@@ -1610,8 +1610,8 @@ bool parse_ft(const std::string &s) {
 	}
 
 	if (at && ft) {
-		flags._file_type = *ft;
-		flags._aux_type = *at;
+		flags.file_type = *ft;
+		flags.aux_type = *at;
 		return true;
 	}
 	return false;
@@ -1637,11 +1637,11 @@ bool parse_ft(const std::string &s) {
 		return lhs + (rhs | 0x20) - 'a' + 10;
 	};
 
-	flags._file_type = std::accumulate(s.begin(), s.begin() + 2, 0, lambda);
-	flags._aux_type = 0;
+	flags.file_type = std::accumulate(s.begin(), s.begin() + 2, 0, lambda);
+	flags.aux_type = 0;
 
 	if (s.length() == 7)
-		flags._aux_type = std::accumulate(s.begin() + 3, s.end(), 0, lambda);
+		flags.aux_type = std::accumulate(s.begin() + 3, s.end(), 0, lambda);
 
 	return true;
 }
@@ -1661,19 +1661,19 @@ int main(int argc, char **argv) {
 	int c;
 	while ((c = getopt(argc, argv, "vCXL:l:o:t:")) != -1) {
 		switch(c) {
-			case 'v': flags._v = true; break;
-			case 'X': flags._X = true; break;
-			case 'C': flags._C = true; break;
-			case 'o': flags._o = optarg; break;
+			case 'v': flags.v = true; break;
+			case 'X': flags.X = true; break;
+			case 'C': flags.C = true; break;
+			case 'o': flags.o = optarg; break;
 			case 'l': {
-				if (*optarg) flags._l.emplace_back(optarg);
+				if (*optarg) flags.l.emplace_back(optarg);
 				break;
 			}
 			case 'L': {
 				std::string tmp(optarg);
 				if (tmp.empty()) tmp = ".";
 				if (tmp.back() != '/') tmp.push_back('/');
-				flags._L.emplace_back(std::move(tmp));
+				flags.L.emplace_back(std::move(tmp));
 				break;
 			}
 			case 'h': help(); break;
@@ -1700,11 +1700,11 @@ int main(int argc, char **argv) {
 	init();
 
 	for (int i = 0 ; i < argc; ++i) {
-		if (!one_file(argv[i])) flags._errors++;
+		if (!one_file(argv[i])) flags.errors++;
 	}
 
 
-	if (flags._v && !undefined_symbols.empty()) {
+	if (flags.v && !undefined_symbols.empty()) {
 		printf("Undefined Symbols:\n");
 		for (const auto & s : undefined_symbols) {
 			printf("%s\n", s.c_str());
@@ -1727,7 +1727,7 @@ int main(int argc, char **argv) {
 	simplify();
 
 
-	if (flags._v) {
+	if (flags.v) {
 		for (const auto &s : sections) {
 			//if (s.flags & SEC_REF_ONLY) continue;
 			printf("section %3d %-20s $%04x $%04x\n",
@@ -1738,7 +1738,7 @@ int main(int argc, char **argv) {
 
 	build_omf_segments();
 
-	if (flags._v) {
+	if (flags.v) {
 		for (const auto &s : omf_segments) {
 			printf("segment %3d %-20s $%04x\n",
 				s.segnum, s.segname.c_str(), (uint32_t)s.data.size());
@@ -1754,15 +1754,15 @@ int main(int argc, char **argv) {
 		}
 	}
 
-	if (flags._o.empty()) flags._o = "out.omf";
-	if (!flags._file_type) {
-		flags._file_type = 0xb3;
+	if (flags.o.empty()) flags.o = "out.omf";
+	if (!flags.file_type) {
+		flags.file_type = 0xb3;
 	}
 
 	void save_omf(const std::string &path, std::vector<omf::segment> &segments, bool compress, bool expressload);
 	int set_file_type(const std::string &path, uint16_t file_type, uint32_t aux_type);
 
-	save_omf(flags._o, omf_segments, !flags._C, !flags._X);
-	set_file_type(flags._o, flags._file_type, flags._aux_type);
+	save_omf(flags.o, omf_segments, !flags.C, !flags.X);
+	set_file_type(flags.o, flags.file_type, flags.aux_type);
 }
 
