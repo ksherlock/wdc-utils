@@ -25,3 +25,11 @@ jobs:
         run: |
           set MSYSTEM=${{ matrix.msys }}
           msys2 -c 'make'
+
+      - name: Artifacts
+        uses: actions/upload-artifact@v2
+        with:
+          name: binaries - ${{ matrix.msys }}
+          path: |
+            wdcdumpobj
+            wdclink
