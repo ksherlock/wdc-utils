@@ -31,5 +31,4 @@ jobs:
         with:
           name: binaries - ${{ matrix.msys }}
           path: |
-            wdcdumpobj
-            wdclink
+            wdcdumpobj.exe wdclink.exe
