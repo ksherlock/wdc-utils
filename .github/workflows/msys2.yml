@@ -8,7 +8,7 @@ jobs:
 
     strategy:
       matrix:
-        msys: [MSYS2, MINGW32, MINGW64]
+        msys: [MSYS, MINGW32, MINGW64]
     steps:
       - uses: actions/checkout@v2
         with:
@@ -18,13 +18,12 @@ jobs:
         uses: msys2/setup-msys2@v2
         with:
           path-type: strict
+          msystem: ${{ matrix.msys }}
           install: make gcc mingw32/mingw-w64-i686-gcc mingw64/mingw-w64-x86_64-gcc
 
       # Runs a single command using the runners shell
       - name: Make ${{ matrix.msys }}
-        run: |
-          set MSYSTEM=${{ matrix.msys }}
-          msys2 -c 'make'
+        run: msys2 -c 'make'
 
       - name: Artifacts
         uses: actions/upload-artifact@v2
