@@ -30,5 +30,4 @@ jobs:
         uses: actions/upload-artifact@v2
         with:
           name: binaries - ${{ matrix.msys }}
-          path: |
-            wdcdumpobj.exe wdclink.exe
+          path: "*.exe"
