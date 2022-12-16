@@ -1647,12 +1647,25 @@ bool parse_ft(const std::string &s) {
 }
 
 
-void help() {
-	exit(0);
-}
 
-void usage() {
-	exit(EX_USAGE);
+
+void usage(int rv) {
+	fputs(
+		"wdclink [flags] file ...\n\n"
+		"Flags:\n"
+		" -h               show usage\n"
+		" -v               be verbose\n"
+		" -X               inhibit ExpressLoad segment\n"
+		" -C               inhibit SUPER records\n"
+		" -S               add stack segment\n"
+		" -1               generate version 1 OMF File\n"
+		" -o file          specify outfile name\n"
+		" -l library       specify library\n"
+		" -L path          specify library path\n"
+		" -t xx[:xxxx]     specify file type\n",
+		stdout
+	);
+	exit(rv);
 }
 
 int main(int argc, char **argv) {
@@ -1661,6 +1674,8 @@ int main(int argc, char **argv) {
 	int c;
 	while ((c = getopt(argc, argv, "vCXL:l:o:t:")) != -1) {
 		switch(c) {
+			case 'h': usage(0); break;
+
 			case 'v': flags.v = true; break;
 			case 'X': flags.X = true; break;
 			case 'C': flags.C = true; break;
@@ -1676,7 +1691,6 @@ int main(int argc, char **argv) {
 				flags.L.emplace_back(std::move(tmp));
 				break;
 			}
-			case 'h': help(); break;
 			case 't': {
 				// -t xx[:xxxx] -- set file/auxtype.
 				if (!parse_ft(optarg)) {
@@ -1685,17 +1699,19 @@ int main(int argc, char **argv) {
 				break;
 			}
 
+
 			case ':':
 			case '?':
 			default:
-				usage();
+				usage(EX_USAGE);
+				break;
 		}
 	}
 
 	argc -= optind;
 	argv += optind;
 
-	if (argc == 0) usage();
+	if (argc == 0) usage(EX_USAGE);
 
 	init();
 
