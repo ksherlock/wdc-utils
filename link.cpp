@@ -41,8 +41,6 @@
 
 struct {
 	bool v = false;
-	bool C = false;
-	bool X = false;
 	bool S = false;
 	std::string o;
 
@@ -50,8 +48,10 @@ struct {
 	std::vector<std::string> L;
 
 	unsigned errors = 0;
-	uint16_t file_type;
-	uint32_t aux_type;
+	uint16_t file_type = 0;
+	uint32_t aux_type = 0;
+
+	unsigned omf_flags = 0;
 } flags;
 
 
@@ -1672,14 +1672,19 @@ int main(int argc, char **argv) {
 
 
 	int c;
-	while ((c = getopt(argc, argv, "vCXL:l:o:t:")) != -1) {
+	while ((c = getopt(argc, argv, "vCXSL:l:o:t:")) != -1) {
 		switch(c) {
 			case 'h': usage(0); break;
 
 			case 'v': flags.v = true; break;
-			case 'X': flags.X = true; break;
-			case 'C': flags.C = true; break;
+			case 'S': flags.S = true; break;
+
+			case '1': flags.omf_flags |= OMF_V1; break;
+			case 'X': flags.omf_flags |= OMF_NO_EXPRESS; break;
+			case 'C': flags.omf_flags |= OMF_NO_SUPER; break;
+
 			case 'o': flags.o = optarg; break;
+
 			case 'l': {
 				if (*optarg) flags.l.emplace_back(optarg);
 				break;
@@ -1775,10 +1780,9 @@ int main(int argc, char **argv) {
 		flags.file_type = 0xb3;
 	}
 
-	void save_omf(const std::string &path, std::vector<omf::segment> &segments, bool compress, bool expressload);
 	int set_file_type(const std::string &path, uint16_t file_type, uint32_t aux_type);
 
-	save_omf(flags.o, omf_segments, !flags.C, !flags.X);
+	save_omf(flags.o, omf_segments, flags.omf_flags);
 	set_file_type(flags.o, flags.file_type, flags.aux_type);
 }
 

@@ -17,6 +17,18 @@
 #define O_BINARY 0
 #endif
 
+enum class endian {
+#ifdef _WIN32
+    little = 0,
+    big    = 1,
+    native = little
+#else
+    little = __ORDER_LITTLE_ENDIAN__,
+    big    = __ORDER_BIG_ENDIAN__,
+    native = __BYTE_ORDER__
+#endif
+};
+
 #pragma pack(push, 1)
 struct omf_header {
 	uint32_t bytecount = 0;
@@ -65,6 +77,87 @@ struct omf_express_header {
 
 static_assert(sizeof(omf_header) == 44, "OMF Header not packed");
 static_assert(sizeof(omf_express_header) == 48, "OMF Express Header not packed");
+
+
+static void swap(uint8_t &x) {}
+static void swap(uint16_t &x) { 
+	#if defined(__GNUC__)
+	x = __builtin_bswap16(x);
+	#else
+	x = (x >> 8) | (x << 8);
+	#endif
+}
+static void swap(uint32_t &x) {
+	#if defined(__GNUC__)
+	x = __builtin_bswap32(x);
+	#else
+	x = ((x & 0xff000000) >> 24) |
+		((x & 0x00ff0000) >> 8) |
+		((x & 0x0000ff00) << 8) |
+		((x & 0x000000ff) << 24);
+	#endif
+}
+
+
+static void to_little(struct omf_header &h) {
+	if (endian::native != endian::little) {
+		swap(h.bytecount);
+		swap(h.reserved_space);
+		swap(h.length);
+		swap(h.unused1);
+		swap(h.lablen);
+		swap(h.numlen);
+		swap(h.version);
+		swap(h.banksize);
+		swap(h.kind);
+		swap(h.unused2);
+		swap(h.org);
+		swap(h.alignment);
+		swap(h.numsex);
+		swap(h.unused3);
+		swap(h.segnum);
+		swap(h.entry);
+		swap(h.dispname);
+		swap(h.dispdata);
+	}
+}
+
+static void to_little(struct omf_express_header &h) {
+	if (endian::native != endian::little) {
+		swap(h.lconst_mark);
+		swap(h.lconst_size);
+		swap(h.reloc_mark);
+		swap(h.reloc_size);
+		swap(h.unused1);
+		swap(h.lablen);
+		swap(h.numlen);
+		swap(h.version);
+		swap(h.banksize);
+		swap(h.kind);
+		swap(h.unused2);
+		swap(h.org);
+		swap(h.alignment);
+		swap(h.numsex);
+		swap(h.unused3);
+		swap(h.segnum);
+		swap(h.entry);
+		swap(h.dispname);
+		swap(h.dispdata);
+	}
+}
+
+
+static void to_v1(struct omf_header &h) {
+
+	// KIND op value used as-is, no translation.
+
+	h.version = 1;
+	// byte count -> block count
+	h.bytecount = (h.bytecount + 511) >> 9;
+	h.unused1 = h.kind;
+	h.kind = 0;
+}
+
 
 void push(std::vector<uint8_t> &v, uint8_t x) {
 	v.push_back(x);
@@ -194,7 +287,7 @@ enum {
 	SUPER_INTERSEG36,
 };
 
-uint32_t add_relocs(std::vector<uint8_t> &data, size_t data_offset, omf::segment &seg, bool compress) {
+uint32_t add_relocs(std::vector<uint8_t> &data, size_t data_offset, omf::segment &seg, bool compress, bool super) {
 
 	std::array< optional<super_helper>, 38 > ss;
 
@@ -203,9 +296,9 @@ uint32_t add_relocs(std::vector<uint8_t> &data, size_t data_offset, omf::segment
 
 	for (auto &r : seg.relocs) {
 
-		if (r.can_compress()) {
+		if (compress && r.can_compress()) {
 
-			if (compress) {
+			if (super) {
 				if (r.shift == 0 && r.size == 2) {
 					constexpr int n = SUPER_RELOC2;
 
@@ -267,9 +360,9 @@ uint32_t add_relocs(std::vector<uint8_t> &data, size_t data_offset, omf::segment
 	}
 
 	for (const auto &r : seg.intersegs) {
-		if (r.can_compress()) {
+		if (compress && r.can_compress()) {
 
-			if (compress) {
+			if (super) {
 
 				if (r.shift == 0 && r.size == 3) {
 					constexpr int n = SUPER_INTERSEG1;
@@ -384,13 +477,24 @@ void save_bin(const std::string &path, omf::segment &segment, uint32_t org) {
 }
 
 
-void save_omf(const std::string &path, std::vector<omf::segment> &segments, bool compress, bool expressload) {
+void save_omf(const std::string &path, std::vector<omf::segment> &segments, unsigned flags) {
 
 	// expressload doesn't support links to other files. 
 	// fortunately, we don't either.
 
 	std::vector<uint8_t> expr_headers;
 	std::vector<unsigned> expr_offsets;
+
+
+	bool compress = !(flags & OMF_NO_COMPRESS);
+	bool super = !(flags & OMF_NO_SUPER);
+	bool expressload = !(flags & OMF_NO_EXPRESS);
+	bool v1 = flags & OMF_V1;
+
+	if (v1) {
+		expressload = false;
+		super = false;
+	}
 
 	int fd;
 	fd = open(path.c_str(), O_WRONLY | O_CREAT | O_TRUNC | O_BINARY, 0666);
@@ -470,16 +574,12 @@ void save_omf(const std::string &path, std::vector<omf::segment> &segments, bool
 		uint32_t reloc_offset = offset + sizeof(omf_header) + data.size();
 		uint32_t reloc_size = 0;
 
-		reloc_size = add_relocs(data, data_offset, s, compress);
+		reloc_size = add_relocs(data, data_offset, s, compress, super);
 
 		// end-of-record
 		push(data, (uint8_t)omf::END);
 
 		h.bytecount = data.size() + sizeof(omf_header);
-
-		// todo -- byteswap to little-endian!
-		offset += write(fd, &h, sizeof(h));
-		offset += write(fd, data.data(), data.size());
 
 		if (expressload) {
 
@@ -514,6 +614,17 @@ void save_omf(const std::string &path, std::vector<omf::segment> &segments, bool
 			push(expr_headers, s.segname);
 		}
 
+		if (v1) to_v1(h);
+		to_little(h);
+
+		offset += write(fd, &h, sizeof(h));
+		offset += write(fd, data.data(), data.size());
+
+		// version 1 needs 512-byte padding for all but final segment.
+		if (v1 && &s != &segments.back()) {
+			static uint8_t zero[512];
+			offset += write(fd, zero, 512 - (offset & 511) );
+		}
 	}
 
 	if (expressload) {
@@ -553,6 +664,7 @@ void save_omf(const std::string &path, std::vector<omf::segment> &segments, bool
 
 		h.bytecount = data.size() + sizeof(omf_header);
 
+		to_little(h);
 		lseek(fd, 0, SEEK_SET);
 		write(fd, &h, sizeof(h));
 		write(fd, data.data(), data.size());

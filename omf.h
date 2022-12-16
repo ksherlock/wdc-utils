@@ -5,6 +5,7 @@
 #include <vector>
 #include <string>
 
+
 namespace omf {
 
 	enum opcode : uint8_t {
@@ -77,5 +78,18 @@ namespace omf {
 
 
 }
+
+enum {
+	// flags
+	OMF_V1 = 1,
+	OMF_V2 = 0,
+	OMF_NO_SUPER = 2,
+	OMF_NO_COMPRESS = 4,
+	OMF_NO_EXPRESS = 8
+
+};
+
+void save_omf(const std::string &path, std::vector<omf::segment> &segments, unsigned flags);
+
 
 #endif
