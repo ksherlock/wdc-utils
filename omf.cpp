@@ -534,6 +534,7 @@ void save_omf(const std::string &path, std::vector<omf::segment> &segments, unsi
 		h.segnum = s.segnum;
 		h.alignment = s.alignment;
 		h.reserved_space = s.reserved_space;
+		h.org = s.org;
 
 		uint32_t reserved_space = 0;
 		if (expressload) {
@@ -607,7 +608,7 @@ void save_omf(const std::string &path, std::vector<omf::segment> &segments, unsi
 			push(expr_headers, h.unused3);
 			push(expr_headers, h.segnum);
 			push(expr_headers, h.entry);
-			push(expr_headers, (uint16_t)(h.dispname-4));
+			push(expr_headers, (uint16_t)(h.dispname));
 			push(expr_headers, h.dispdata);
 
 			expr_headers.insert(expr_headers.end(), 10, ' ');
@@ -653,6 +654,7 @@ void save_omf(const std::string &path, std::vector<omf::segment> &segments, unsi
 			push(data, (uint16_t)(fudge + offset));
 			push(data, (uint16_t)0);
 			push(data, (uint32_t)0);
+			fudge -= 8;
 		}
 
 		for (auto &s : segments) {
